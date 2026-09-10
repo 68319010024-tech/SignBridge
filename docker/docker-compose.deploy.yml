@@ -1,0 +1,34 @@
+# SignBridge - deploy stack สำหรับเซิร์ฟเวอร์จริง (environment "rov2" ใน Portainer)
+#
+# ต่างจาก docker-compose.yml (ตัวสำหรับทดสอบในเครื่อง/โน้ตบุ๊คเอง ที่ยังใช้
+# http://localhost:8080 ได้ตามปกติ) ไฟล์นี้ผูก network เข้ากับ multi-host_default
+# ซึ่งเป็น network เดิมของ Nginx Proxy Manager ที่มีอยู่แล้วบนเซิร์ฟเวอร์ เพื่อให้ NPM
+# เรียก container นี้ด้วยชื่อ "signbridge-frontend" ได้เลย โดยไม่ publish พอร์ตออกสู่
+# host เพื่อกันชนกับ service อื่นที่แชร์เครื่องเดียวกันอยู่ (เช่น E-Sport)
+#
+# วิธี deploy:
+#   Portainer -> environment "rov2" -> Stacks -> Add stack -> Repository
+#   -> Repository URL: (URL ของ repo นี้บน GitHub)
+#   -> Reference: refs/heads/master
+#   -> Compose path: docker/docker-compose.deploy.yml
+#   -> Deploy the stack
+#
+# จากนั้นไปตั้งค่าใน NPM: Hosts -> Proxy Hosts -> แก้ host ของ webapp.htc.ac.th
+# (ห้ามลบของเดิม) -> แท็บ Custom Locations -> Add location:
+#   Define location: /ai/
+#   Forward Hostname/IP: signbridge-frontend
+#   Forward Port: 80
+
+services:
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: signbridge-frontend
+    restart: unless-stopped
+    networks:
+      - multi-host_default
+
+networks:
+  multi-host_default:
+    external: true

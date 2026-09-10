@@ -1,0 +1,67 @@
+# SignBridge - infrastructure stack (Portainer + Nginx Proxy Manager)
+#
+# รันไฟล์นี้บน "เครื่องหลัก" เพียงเครื่องเดียว คือเครื่องที่มี IP/โดเมน
+# ที่คนนอกเข้าถึงได้ (เครื่องที่จะรับทราฟฟิกจริงจากอินเทอร์เน็ต)
+#
+# ใช้งาน:
+#   docker compose -f docker/docker-compose.infra.yml up -d
+#
+# ครั้งแรกที่เข้าใช้งาน:
+#   - Portainer  : https://<ip เครื่องหลัก>:9443  -> ต้องสร้างบัญชี admin ภายใน 5 นาที
+#                  แรกที่เข้า ไม่งั้นต้องรีสตาร์ท container ใหม่
+#   - NPM        : http://<ip เครื่องหลัก>:81     -> login เริ่มต้น
+#                  admin@example.com / changeme (ระบบจะบังคับเปลี่ยนรหัสทันที)
+#
+# ============================================================
+# ถ้ามีเซิร์ฟเวอร์มากกว่า 1 เครื่อง (multi-host)
+# ============================================================
+# ห้ามรันไฟล์นี้ซ้ำบนเครื่องอื่น! ให้ทำตามนี้แทน:
+#
+# 1. บนเครื่องหลัก (เครื่องนี้) รันไฟล์นี้ตามปกติ แล้วเปิด Portainer เข้าไปหน้า
+#    Environments -> Add environment -> Docker Standalone -> Agent
+#    จะได้คำสั่ง `docker run ... portainer/agent` พร้อม endpoint URL มาให้
+#
+# 2. บนเครื่องเพิ่มเติมแต่ละเครื่อง (ไม่ต้อง clone repo นี้ก็ได้) รันแค่ agent:
+#      docker run -d -p 9001:9001 --name portainer_agent --restart=always \
+#        -v /var/run/docker.sock:/var/run/docker.sock \
+#        -v /var/lib/docker/volumes:/var/lib/docker/volumes \
+#        portainer/agent:2.21.4
+#
+# 3. กลับมาหน้า Portainer เครื่องหลัก วาง endpoint URL ของเครื่องนั้น (ip:9001)
+#    -> ตอนนี้จะเห็นและสั่งงาน container ของทุกเครื่องได้จากหน้าเว็บเดียว
+#
+# 4. ส่วน Nginx Proxy Manager ยังอยู่เครื่องหลักเครื่องเดียว ไม่ต้องติดตั้งซ้ำ —
+#    เวลาสร้าง "Proxy Host" ให้เว็บ/บริการที่รันอยู่บนเครื่องอื่น ให้ใส่ Forward
+#    Hostname/IP เป็น IP ของเครื่องนั้น และ Forward Port เป็นพอร์ตที่ service
+#    เครื่องนั้น publish ออกมา (เช่นเดียวกับ frontend ที่ publish 8080 ใน
+#    docker-compose.yml) — ต่างจาก service ที่อยู่เครื่องเดียวกับ NPM ซึ่งใส่
+#    ชื่อ container แทน IP ได้เลยถ้าอยู่ Docker network เดียวกัน
+
+services:
+  portainer:
+    image: portainer/portainer-ce:2.21.4
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9443:9443" # Portainer Web UI (HTTPS)
+      - "8000:8000" # Edge Agent tunnel (ใช้เฉพาะถ้าต่อ agent แบบ Edge)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+
+  nginx-proxy-manager:
+    image: jc21/nginx-proxy-manager:2.11.3
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      - "80:80" # HTTP - ทราฟฟิกจริงจากผู้ใช้
+      - "443:443" # HTTPS
+      - "81:81" # NPM Admin UI
+    volumes:
+      - npm_data:/data
+      - npm_letsencrypt:/etc/letsencrypt
+
+volumes:
+  portainer_data:
+  npm_data:
+  npm_letsencrypt:
