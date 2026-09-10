@@ -1,0 +1,11 @@
+# 1. สั่งรัน Portainer และ Nginx Proxy Manager (Infrastructure Layer)
+docker compose -f docker/docker-compose.infra.yml up -d
+
+# 2. สั่ง Build และรันบริการหลักทั้งหมด (Frontend, Backend, AI Engine, MariaDB)
+docker compose -f docker/docker-compose.yml up -d --build
+
+# 3. ตรวจสอบสถานะของ Containers ทั้งหมดที่กำลังทำงานอยู่
+docker compose -f docker/docker-compose.yml ps
+
+# 4. คำสั่งดู Logs สดของบริการ (เช่น ดู Log ของ AI Engine หรือ Backend)
+docker compose -f docker/docker-compose.yml logs -f ai-engine

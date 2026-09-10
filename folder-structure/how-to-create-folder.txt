@@ -1,0 +1,19 @@
+คำสั่งสร้างโครงสร้างโฟลเดอร์และไฟล์ทั้งหมด (Run ที่ Root: SignBridge/)
+
+# 1. Infrastructure, Database & GitHub Workflows
+mkdir -p .github/workflows, docker/mariadb, database/migrations, database/seeds
+
+# 2. Backend (Node.js + Express + TypeScript)
+mkdir -p backend/src/config, backend/src/controllers, backend/src/middlewares, backend/src/models, backend/src/routes, backend/src/services, backend/src/utils
+New-Item -ItemType File -Path backend/src/config/database.ts, backend/src/controllers/analyticsController.ts, backend/src/controllers/quizController.ts, backend/src/controllers/studentController.ts, backend/src/middlewares/authMiddleware.ts, backend/src/models/GrammarRule.ts, backend/src/models/StudentProgress.ts, backend/src/models/Vocabulary.ts, backend/src/routes/analyticsRoutes.ts, backend/src/routes/quizRoutes.ts, backend/src/services/syntaxBridgeService.ts, backend/src/services/trackingService.ts, backend/src/utils/helpers.ts, backend/src/app.ts, backend/.dockerignore, backend/.env, backend/Dockerfile, backend/package.json, backend/tsconfig.json -Force
+
+# 3. Frontend (React + TailwindCSS + Dictionary & Quiz UI)
+mkdir -p frontend/public, frontend/src/assets/icons, frontend/src/components/common, frontend/src/components/webcam, frontend/src/components/bridge, frontend/src/components/dictionary, frontend/src/components/quiz, frontend/src/pages, frontend/src/services, frontend/src/styles
+New-Item -ItemType File -Path frontend/public/favicon.ico, frontend/src/components/common/Navbar.tsx, frontend/src/components/common/Sidebar.tsx, frontend/src/components/webcam/WebcamStream.tsx, frontend/src/components/webcam/CameraControls.tsx, frontend/src/components/bridge/BridgeAnimation.tsx, frontend/src/components/bridge/GrammarBridge.tsx, frontend/src/components/dictionary/CategoryCard.tsx, frontend/src/components/dictionary/WordCard.tsx, frontend/src/components/dictionary/VideoPlayer.tsx, frontend/src/components/quiz/MiniQuiz.tsx, frontend/src/components/quiz/QuizTimer.tsx, frontend/src/components/quiz/QuizHeader.tsx, frontend/src/components/quiz/QuizFeedback.tsx, frontend/src/pages/StudentDashboard.tsx, frontend/src/pages/DictionaryPage.tsx, frontend/src/pages/CategoryDetailPage.tsx, frontend/src/pages/WordDetailPage.tsx, frontend/src/pages/QuizPage.tsx, frontend/src/pages/TeacherDashboard.tsx, frontend/src/services/apiService.ts, frontend/src/styles/globals.css, frontend/src/App.tsx, frontend/src/main.tsx, frontend/.dockerignore, frontend/Dockerfile, frontend/nginx.conf, frontend/package.json, frontend/tailwind.config.js, frontend/vite.config.ts -Force
+
+# 4. AI Engine (Python + TensorFlow + MediaPipe)
+mkdir -p ai-engine/dataset/raw_videos, ai-engine/dataset/processed_data, ai-engine/models, ai-engine/src/detectors
+New-Item -ItemType File -Path ai-engine/src/detectors/mediapipe_tracker.py, ai-engine/src/detectors/token_parser.py, ai-engine/src/01_extract_landmarks.py, ai-engine/src/02_train_model.py, ai-engine/src/03_realtime_inference.py, ai-engine/src/server.py, ai-engine/.dockerignore, ai-engine/Dockerfile, ai-engine/main.py, ai-engine/requirements.txt -Force
+
+# 5. Config & Root Files
+New-Item -ItemType File -Path .github/workflows/deploy.yml, docker/mariadb/init.sql, docker/docker-compose.infra.yml, docker/docker-compose.yml, database/schema.sql, .env, .gitignore, README.md -Force

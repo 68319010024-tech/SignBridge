@@ -1,0 +1,12 @@
+npm install lucide-react
+
+echo {"name": "frontend", "private": true, "version": "0.0.0", "type": "module", "scripts": {"dev": "vite", "build": "tsc && vite build"}, "dependencies": {}, "devDependencies": {}} > package.json
+
+npm install react react-dom react-router-dom
+npm install -D vite @types/react @types/react-dom @types/node tailwindcss postcss autoprefixer typescript
+
+echo import { defineConfig } from 'vite'; import react from '@vitejs/plugin-react'; export default defineConfig({ plugins: [react()] }); > vite.config.ts
+
+npm install -D @vitejs/plugin-react
+
+npm run dev

@@ -1,0 +1,130 @@
+signbridge-project/
+├── .github/                       # CI/CD Automated Deployment
+│   └── workflows/
+│       └── deploy.yml             # GitHub Actions Workflow
+│
+├── docker/                        # Container & Infrastructure Configuration
+│   ├── mariadb/
+│   │   └── init.sql               # Database Schema Initialization & Seeds
+│   ├── docker-compose.infra.yml   # Infrastructure Stack (Portainer + Nginx Proxy Manager)
+│   └── docker-compose.yml         # Core App Stack (Frontend, Backend, AI Engine, MariaDB)
+│
+├── database/                      # Database Schema & Migration Scripts
+│   ├── migrations/
+│   ├── seeds/
+│   └── schema.sql                 # Initial Table Structures
+│
+├── backend/                       # Node.js REST API Gateway (TypeScript)
+│   ├── src/
+│   │   ├── config/                # MariaDB Connection Setup
+│   │   │   └── database.ts
+│   │   ├── controllers/           # API Controllers
+│   │   │   ├── analyticsController.ts
+│   │   │   ├── quizController.ts
+│   │   │   └── studentController.ts
+│   │   ├── middlewares/           # Authentication & Error Middlewares
+│   │   │   └── authMiddleware.ts
+│   │   ├── models/                # MariaDB Data Models / Schema Entities
+│   │   │   ├── GrammarRule.ts
+│   │   │   ├── StudentProgress.ts
+│   │   │   └── Vocabulary.ts
+│   │   ├── routes/                # Express Endpoint Routes
+│   │   │   ├── analyticsRoutes.ts
+│   │   │   └── quizRoutes.ts
+│   │   ├── services/              # Core Business Logic
+│   │   │   ├── syntaxBridgeService.ts   # Own Rule-Based Grammar Transformation Engine[cite: 1]
+│   │   │   └── trackingService.ts       # Student Progress & Analytics Tracker Engine[cite: 1]
+│   │   ├── utils/                 # Helpers & Utility Functions
+│   │   │   └── helpers.ts
+│   │   └── app.ts                 # Express Application Entry Point
+│   ├── .dockerignore
+│   ├── .env                       # Backend Environment Variables
+│   ├── Dockerfile                 # Node.js Container Setup
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── frontend/                      # Client-Side Application (React + Tailwind CSS)
+│   ├── public/                    # Static Assets
+│   │   └── favicon.ico
+│   ├── src/
+│   │   ├── assets/                # Media Assets
+│   │   │   └── icons/             # Category & UI Action Icons
+│   │   ├── components/            # Reusable UI Components
+│   │   │   ├── common/            # Global UI Elements
+│   │   │   │   ├── Navbar.tsx     # Top Header Component
+│   │   │   │   └── Sidebar.tsx    # Left Navigation Bar
+│   │   │   ├── webcam/            # Camera Handling Module
+│   │   │   │   ├── WebcamStream.tsx   # Video Feed & Detection Overlay[cite: 1]
+│   │   │   │   └── CameraControls.tsx # Open/Switch Camera & Background Blur Toggles
+│   │   │   ├── bridge/            # Transformation Engine UI
+│   │   │   │   ├── BridgeAnimation.tsx # Word Shuffling Arrows Animation[cite: 1]
+│   │   │   │   └── GrammarBridge.tsx # Thai vs Sign Grammar Comparison Display
+│   │   │   ├── dictionary/        # TTRS Dictionary Components
+│   │   │   │   ├── CategoryCard.tsx # Word Category Cards
+│   │   │   │   ├── WordCard.tsx     # Vocabulary Item Cards
+│   │   │   │   └── VideoPlayer.tsx  # TTRS Sign Language Video Preview
+│   │   │   └── quiz/              # Active Learning Mini Quiz[cite: 1]
+│   │   │       ├── MiniQuiz.tsx     # Main Quiz Container
+│   │   │       ├── QuizTimer.tsx    # Circular Countdown Timer (10s)
+│   │   │       ├── QuizHeader.tsx   # Question Counter & Status Indicators
+│   │   │       └── QuizFeedback.tsx # Green/Red Glowing Border Feedback
+│   │   ├── pages/                 # View Screens
+│   │   │   ├── StudentDashboard.tsx   # Real-time Sign-to-Thai Bridge Screen
+│   │   │   ├── DictionaryPage.tsx     # Vocabulary Categories Overview
+│   │   │   ├── CategoryDetailPage.tsx # Word Selection in Category
+│   │   │   ├── WordDetailPage.tsx     # TTRS Video & Word Details Screen
+│   │   │   ├── QuizPage.tsx           # Active Learning Game/Quiz Screen
+│   │   │   └── TeacherDashboard.tsx   # Progress Analytics & Dataset Upload
+│   │   ├── services/              # API Client Services (Axios/Fetch)
+│   │   │   └── apiService.ts
+│   │   ├── styles/                # Global Styles & Tailwind Config
+│   │   │   └── globals.css
+│   │   ├── App.tsx                # App Routing & Base Layout
+│   │   └── main.tsx               # React Entry Point
+│   ├── .dockerignore
+│   ├── Dockerfile                 # React Build & Nginx Web Server Setup
+│   ├── nginx.conf                 # Internal SPA Routing Config
+│   ├── package.json
+│   ├── tailwind.config.js
+│   └── vite.config.ts
+│
+├── ai-engine/                     # Python AI Service (TensorFlow, MediaPipe, OpenCV)
+│   ├── dataset/
+│   │   ├── raw_videos/            # รวมไฟล์วิดีโอ MP4 แยกหมวดหมู่
+│   │   │   ├── หมวดคำถาม บอกเวลา/
+│   │   │   │   ├── ยัง.mp4
+│   │   │   │   ├── ร้อน.mp4
+│   │   │   │   ├── วันนี้.mp4
+│   │   │   │   └── ...
+│   │   │   ├── หมวดคำปฏิเสธและคำถาม/
+│   │   │   ├── หมวดมารยาทการสื่อสาร/
+│   │   │   ├── หมวดวัตถุสถานที่สิ่งของ/
+│   │   │   ├── หมวดสรรพนามและบุคคล/
+│   │   │   └── หมวดกริยาความต้องการ/
+│   │   │
+│   │   └── processed_data/        # Feature Arrays ที่สกัดจาก MP4
+│   │       ├── x_data.npy         # Extracted Landmark Coordinates Array
+│   │       ├── y_data.npy         # Word Labels Array
+│   │       └── label_map.json     # Word-to-Index Mappings
+│   │
+│   ├── models/                    # Saved TensorFlow Models
+│   │   ├── gesture_model.h5       # Trained Model File
+│   │   └── label_encoder.pkl      # Saved Label Classes
+│   │
+│   ├── src/
+│   │   ├── detectors/             # Detection Core Logic
+│   │   │   ├── mediapipe_tracker.py # Skeleton & Hand Tracking Engine[cite: 1]
+│   │   │   └── token_parser.py     # Landmarks-to-Tokens Processor
+│   │   ├── 01_extract_landmarks.py # [Step 1] Extract Coordinates from MP4s
+│   │   ├── 02_train_model.py       # [Step 2] Train TensorFlow LSTM/1D-CNN
+│   │   ├── 03_realtime_inference.py# [Step 3] Local Webcam Test Script
+│   │   └── server.py              # FastAPI / Flask Service Gateway
+│   │
+│   ├── .dockerignore
+│   ├── Dockerfile                 # Python Environment Docker Container
+│   ├── main.py                    # AI Service Entry Point
+│   └── requirements.txt           # opencv-python, mediapipe, tensorflow, numpy, scikit-learn
+│
+├── .env                           # Root Environment Variables
+├── .gitignore
+└── README.md                      # Documentation & Run Guides

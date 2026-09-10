@@ -1,0 +1,15 @@
+# SignBridge - core app stack
+#
+# ตอนนี้มีแค่ "frontend" ที่มีโค้ดทำงานได้จริงและ build ผ่านแล้วเท่านั้น
+# ส่วน backend/ และ ai-engine/ ยังเป็นไฟล์โครงเปล่า (ไม่มีโค้ด) และ database/schema.sql
+# ก็ยังว่างเปล่า จึงยังไม่เพิ่มเข้ามาในสแตกนี้ - ให้เพิ่ม service เหล่านี้เข้ามาเมื่อมีโค้ด
+# และ schema จริงพร้อมใช้งานแล้ว เพื่อไม่ให้ได้ container ที่ build ผ่านแต่ใช้งานจริงไม่ได้
+
+services:
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    restart: unless-stopped
