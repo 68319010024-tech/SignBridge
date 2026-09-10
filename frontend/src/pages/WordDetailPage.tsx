@@ -83,8 +83,10 @@ export const WordDetailPage: React.FC<WordDetailPageProps> = ({
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  // ดึงไฟล์วิดีโอใบแรกในโฟลเดอร์คำศัพท์
-  const videoSrc = encodeURI(`/video/${categoryName}/${wordName}/${wordName}-1.mp4`);
+  // ดึงไฟล์วิดีโอใบแรกในโฟลเดอร์คำศัพท์ — ใช้ path แบบ relative (ไม่ใส่ "/" นำหน้า) ให้สอดคล้องกับ
+  // base: './' ใน vite.config.ts เพราะ path ที่ขึ้นต้นด้วย "/" จะอ้างอิงจาก domain root เสมอ ซึ่งพัง
+  // ตอนแอปถูกเสิร์ฟใต้ subpath อย่าง /ai/ บนเซิร์ฟเวอร์ที่ domain root ชี้ไปที่แอปอื่น
+  const videoSrc = encodeURI(`video/${categoryName}/${wordName}/${wordName}-1.mp4`);
 
   // ดึงชนิดของคำจาก Mapping
   const wordType = wordTypeMapping[wordName] || 'คำนาม';
