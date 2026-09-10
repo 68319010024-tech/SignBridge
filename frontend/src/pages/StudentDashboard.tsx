@@ -20,9 +20,9 @@ import DictionaryPage from './DictionaryPage';
 import CategoryDetailPage from './CategoryDetailPage';
 import WordDetailPage from './WordDetailPage';
 import GamePage from './GamePage';
+import { resolveWsUrl } from '../services/wsConfig';
 
-// ปลายทาง WebSocket ของ Python Backend (ai-engine/src/03_realtime_inference.py)
-const WS_URL = 'ws://127.0.0.1:8000';
+const WS_URL = resolveWsUrl();
 const FRAME_SEND_INTERVAL_MS = 100; // ~10 FPS
 
 type WsStatus = 'connecting' | 'connected' | 'disconnected';

@@ -1,0 +1,10 @@
+# Runtime deps for ai-engine/src/server.py, pinned for Linux containers.
+#
+# requirements.txt is a Windows dev-machine `pip freeze` (includes tensorflow-intel,
+# which has no Linux wheel) and pulls training/notebook-only tooling. This file has
+# just what server.py imports, with Linux-safe equivalents.
+numpy==1.26.4
+tensorflow==2.15.1
+mediapipe==0.10.9
+opencv-python-headless==4.11.0.86
+websockets==17.1

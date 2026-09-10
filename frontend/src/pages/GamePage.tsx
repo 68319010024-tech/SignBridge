@@ -13,8 +13,9 @@ import {
   Timer,
   Radar
 } from 'lucide-react';
+import { resolveWsUrl } from '../services/wsConfig';
 
-const WS_URL = 'ws://127.0.0.1:8000';
+const WS_URL = resolveWsUrl();
 const FRAME_SEND_INTERVAL_MS = 100;
 
 type Difficulty = 'easy' | 'medium' | 'hard';

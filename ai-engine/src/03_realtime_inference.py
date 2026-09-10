@@ -18,7 +18,7 @@ MODELS_DIR = os.path.join(BASE_DIR, "models")
 MODEL_PATH = os.path.join(MODELS_DIR, "sign_model.h5")
 LABEL_MAP_PATH = os.path.join(MODELS_DIR, "label_map.json")
 
-HOST = "127.0.0.1"
+HOST = "0.0.0.0"
 PORT = 8000
 
 # ดึงเฉพาะคิ้ว ตา และปาก (40 จุด = 120 ค่า)

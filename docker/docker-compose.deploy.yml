@@ -18,6 +18,17 @@
 #   Define location: /ai/
 #   Forward Hostname/IP: signbridge-frontend
 #   Forward Port: 80
+#
+# แล้ว Add location อีกอันสำหรับ ai-engine (WebSocket):
+#   Define location: /ai/ws/
+#   Forward Hostname/IP: signbridge-ai-engine
+#   Forward Port: 8000
+#   กด gear icon ของ location นี้ ใส่ Custom Nginx Configuration:
+#     proxy_http_version 1.1;
+#     proxy_set_header Upgrade $http_upgrade;
+#     proxy_set_header Connection "upgrade";
+#   (ทำแบบนี้เพราะ toggle "Websockets Support" ที่แท็บ Details ของ NPM ใช้ได้แค่กับ
+#   location หลักของ host เท่านั้น ไม่ครอบคลุม Custom Locations)
 
 services:
   frontend:
@@ -25,6 +36,15 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
     container_name: signbridge-frontend
+    restart: unless-stopped
+    networks:
+      - multi-host_default
+
+  ai-engine:
+    build:
+      context: ../ai-engine
+      dockerfile: Dockerfile
+    container_name: signbridge-ai-engine
     restart: unless-stopped
     networks:
       - multi-host_default
