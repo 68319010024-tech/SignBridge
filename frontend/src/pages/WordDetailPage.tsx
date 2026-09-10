@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Play, Pause, Tag, Folder, SpellCheck } from 'lucide-react';
+import { useIsMobileView } from '../hooks/useIsMobileView';
 
 interface WordDetailPageProps {
   wordName: string;
@@ -74,6 +75,11 @@ export const WordDetailPage: React.FC<WordDetailPageProps> = ({
   categoryName,
   onBack,
 }) => {
+  const isMobileView = useIsMobileView();
+  // จอแท็บเล็ต (เช่น iPad แนวนอน) ก็ยังไม่มีที่พอให้วิดีโอสูงคงที่ 550px แบบ desktop เหมือนกัน
+  // เลยให้ใช้ aspect-ratio + ปล่อยให้หน้า (ไม่ใช่กล่องนี้เอง) เป็นตัวเลื่อนเหมือนโหมดมือถือไปเลย
+  const isTabletView = useIsMobileView(1366);
+  const isCompactView = isMobileView || isTabletView;
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -107,10 +113,10 @@ export const WordDetailPage: React.FC<WordDetailPageProps> = ({
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        padding: '24px',
+        padding: isMobileView ? '16px' : '24px',
         background: 'radial-gradient(circle at 100% 0%, #f0f7ff 0%, #eaf1fb 45%)',
         color: '#1e293b',
-        height: '100%',
+        height: isCompactView ? 'auto' : '100%',
         boxSizing: 'border-box'
       }}
     >
@@ -178,19 +184,29 @@ export const WordDetailPage: React.FC<WordDetailPageProps> = ({
 
       <div style={{ width: '100%', height: '1px', background: 'linear-gradient(90deg, transparent, #dce8f7 15%, #dce8f7 85%, transparent)', marginBottom: '18px', flexShrink: 0 }} />
 
-      {/* MAIN CONTENT AREA */}
-      <div className="sb-scroll" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto' }}>
-        
-        {/* VIDEO CONTAINER */}
-        <div 
+      {/* MAIN CONTENT AREA — บนมือถือไม่ใส่ flex:1/overflowY:auto ที่นี่ ปล่อยให้สูงตามเนื้อหาจริง
+          แล้วให้หน้า (ancestor ที่ตั้ง overflow:auto ไว้แล้ว) เป็นตัวเลื่อนจุดเดียว ไม่งั้นจะเจอ
+          ปัญหาเดิม: ส่วนท้าย (รายละเอียดคำศัพท์) โดนตัดจนเลื่อนลงไปดูไม่สุด */}
+      <div className="sb-scroll" style={{ display: 'flex', flexDirection: 'column', gap: isMobileView ? '14px' : '20px', flex: isCompactView ? undefined : 1, overflowY: isCompactView ? 'visible' : 'auto' }}>
+
+        {/* VIDEO CONTAINER — บนมือถือใช้ aspect-ratio แทนความสูงคงที่ 550px เพื่อให้พอดีความกว้าง
+            จอจริงแทนที่จะถูกบีบจนวิดีโอเหลือแถบเล็ก ๆ ตรงกลาง */}
+        <div
           className="sb-video-box"
           onClick={togglePlay}
-          style={{ 
-            width: '100%', 
-            height: '550px', 
-            backgroundColor: '#000000', 
-            borderRadius: '28px', 
-            border: '3px solid #0d47a1', 
+          style={{
+            width: '100%',
+            height: isCompactView ? undefined : '550px',
+            aspectRatio: isCompactView ? '16 / 9' : undefined,
+            // จอกว้างแต่เตี้ย (เช่น iPad แนวนอน) ถ้าคำนวณความสูงจาก aspect-ratio 16:9 ตามความกว้าง
+            // เต็มจอเฉยๆ อาจสูงจนบังรายละเอียดคำศัพท์ด้านล่างไปหมด จึงจำกัดเพดานความสูงไว้ (แค่พอให้เห็น
+            // แถว "ชื่อคำศัพท์" แถวแรกโผล่มา ส่วนแถวที่เหลือ (หมวดหมู่/ชนิดของคำ) ให้ผู้ใช้เลื่อนดูเอง —
+            // ไม่ใช่จำกัดแคบจนวิดีโอเล็กเกินไปแบบก่อนหน้านี้) object-fit: contain ของ <video> ด้านใน
+            // ทำให้สัดส่วนวิดีโอยังถูกต้องเสมอไม่ว่ากล่องจะถูกจำกัดความสูงแค่ไหน
+            maxHeight: isCompactView ? '60dvh' : undefined,
+            backgroundColor: '#000000',
+            borderRadius: '28px',
+            border: '3px solid #0d47a1',
             position: 'relative',
             overflow: 'hidden',
             display: 'flex',

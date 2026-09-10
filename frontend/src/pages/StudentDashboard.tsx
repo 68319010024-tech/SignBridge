@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  Camera, 
-  RefreshCw, 
-  Grid, 
-  Flag, 
+import {
+  Camera,
+  RefreshCw,
+  Grid,
+  Flag,
   Hand,
   Home,
   BookOpen,
@@ -13,7 +13,11 @@ import {
   RotateCcw,
   Sparkles,
   Aperture,
-  History
+  History,
+  Menu,
+  X,
+  CloudFog,
+  Bone
 } from 'lucide-react';
 
 import DictionaryPage from './DictionaryPage';
@@ -21,6 +25,8 @@ import CategoryDetailPage from './CategoryDetailPage';
 import WordDetailPage from './WordDetailPage';
 import GamePage from './GamePage';
 import { resolveWsUrl } from '../services/wsConfig';
+import { useIsMobileView } from '../hooks/useIsMobileView';
+import { MobileControlButton } from '../components/common/MobileControlButton';
 
 const WS_URL = resolveWsUrl();
 const FRAME_SEND_INTERVAL_MS = 100; // ~10 FPS
@@ -59,6 +65,11 @@ export const StudentDashboard: React.FC = () => {
 
   // State การเชื่อมต่อ WebSocket กับ Python Backend
   const [wsStatus, setWsStatus] = useState<WsStatus>('connecting');
+
+  // State ควบคุม Responsive Sidebar: จอเล็ก (มือถือ/แท็บเล็ต) ให้ซ่อน sidebar ไว้เป็นค่าเริ่มต้น
+  // แล้วเปิดผ่านปุ่ม hamburger แทน
+  const isMobileView = useIsMobileView();
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   // State แสดงโครงกระดูก (skeleton overlay) ที่ backend วาดกลับมาให้
   const [isShowSkeleton, setIsShowSkeleton] = useState<boolean>(false);
@@ -302,6 +313,11 @@ export const StudentDashboard: React.FC = () => {
     if (!isShowSkeleton) setSkeletonFrame(null);
   }, [isShowSkeleton]);
 
+  // ปิด sidebar drawer อัตโนมัติเมื่อจอขยายกลับไปเป็นโหมด desktop
+  useEffect(() => {
+    if (!isMobileView) setIsSidebarOpen(false);
+  }, [isMobileView]);
+
   // เชื่อมต่อ WebSocket กับ Python Backend พร้อมระบบ auto-reconnect (exponential backoff)
   useEffect(() => {
     let isUnmounted = false;
@@ -431,8 +447,92 @@ export const StudentDashboard: React.FC = () => {
     };
   }, []);
 
+  // กล่องแสดงภาพกล้อง (ใช้ร่วมกันทั้ง layout desktop และ mobile — มี video/canvas ref
+  // ตัวเดียวกัน เปลี่ยนแค่ขนาด/ตำแหน่งของ container ที่ห่อมันตามแต่ละ layout)
+  const cameraBox = (
+    <div
+      style={{
+        flex: 1,
+        backgroundColor: '#000000',
+        borderRadius: '32px',
+        border: isCameraOn ? '3px solid #0d47a1' : '3px solid #ef4444',
+        boxShadow: isCameraOn
+          ? '0 0 20px rgba(13, 71, 161, 0.3)'
+          : '0 0 20px rgba(239, 68, 68, 0.5)',
+        position: 'relative',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.3s ease-in-out'
+      }}
+    >
+      {isCameraOn && (
+        <div style={{ position: 'absolute', top: '16px', left: '16px', display: 'flex', alignItems: 'center', gap: '7px', backgroundColor: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '9999px', padding: '6px 14px', zIndex: 3, backdropFilter: 'blur(4px)' }}>
+          <span className="sb-live-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
+          <span style={{ fontSize: '12px', fontWeight: '800', color: '#ffffff', letterSpacing: '0.5px' }}>LIVE</span>
+        </div>
+      )}
+
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        style={{ display: 'none' }}
+      />
+
+      {/* Canvas ซ่อนไว้สำหรับจับภาพจาก video ส่งเข้า Backend โดยตรง (ไม่ผ่าน rAF) */}
+      <canvas ref={sendCanvasRef} style={{ display: 'none' }} />
+
+      <canvas
+        ref={canvasRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          display: isCameraOn ? 'block' : 'none'
+        }}
+      />
+
+      {isCameraOn && isShowSkeleton && skeletonFrame && (
+        <img
+          src={skeletonFrame}
+          alt="โครงกระดูกที่ตรวจจับได้"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            zIndex: 2
+          }}
+        />
+      )}
+
+      {!isCameraOn && (
+        <div style={{ textAlign: 'center', padding: '16px' }}>
+          <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
+            <Camera style={{ width: '24px', height: '24px', color: '#ef4444' }} />
+          </div>
+          <p style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '20px', margin: 0, textShadow: '0 0 8px rgba(239,68,68,0.4)' }}>
+            กรุณากดเปิดกล้อง
+          </p>
+          <p style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '20px', margin: '4px 0 0 0', textShadow: '0 0 8px rgba(239,68,68,0.4)' }}>
+            ก่อนใช้งานระบบ
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div style={{ backgroundColor: '#eaf1fb', width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', color: '#1e293b', fontFamily: "'Noto Sans Thai', 'Sarabun', -apple-system, sans-serif", overflow: 'hidden' }}>
+    // ใช้ 100dvh แทน 100vh: บน iPad/iPhone Safari, 100vh คำนวณจากความสูงจอสูงสุด (เหมือน address
+    // bar ถูกซ่อนอยู่เสมอ) ซึ่งสูงกว่าพื้นที่แสดงผลจริงเวลามี address bar/toolbar โผล่มา ทำให้ layout
+    // ที่ตั้งใจให้พอดีจอเป๊ะ (overflow: hidden ไม่มี scroll) มีส่วนล่างเกินจอจริงไปโดยไม่มีทางเลื่อนไปดูได้
+    // 100dvh คำนวณจากพื้นที่แสดงผลที่มองเห็นจริง ณ ขณะนั้น จึงพอดีจอเสมอ
+    <div style={{ backgroundColor: '#eaf1fb', width: '100vw', height: '100dvh', display: 'flex', flexDirection: 'column', color: '#1e293b', fontFamily: "'Noto Sans Thai', 'Sarabun', -apple-system, sans-serif", overflow: 'hidden' }}>
 
       {/* GLOBAL DECORATIVE STYLES */}
       <style>{`
@@ -463,21 +563,46 @@ export const StudentDashboard: React.FC = () => {
 
       {/* TOPBAR */}
       <header style={{ background: 'linear-gradient(120deg, #0d47a1 0%, #123a80 28%, #1a5aa8 55%, #4fa3e0 82%, #6fbeef 100%)', height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0, boxShadow: '0 4px 16px -4px rgba(13,71,161,0.4)', position: 'relative', zIndex: 2 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '46px', height: '46px', backgroundColor: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #bfe1f9', boxShadow: '0 0 0 3px rgba(255,255,255,0.15), 0 3px 10px rgba(0,0,0,0.15)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
+          {isMobileView && (
+            <button
+              onClick={() => setIsSidebarOpen((open) => !open)}
+              aria-label={isSidebarOpen ? 'ปิดเมนู' : 'เปิดเมนู'}
+              style={{
+                width: '38px',
+                height: '38px',
+                flexShrink: 0,
+                borderRadius: '10px',
+                border: '1px solid rgba(255,255,255,0.3)',
+                backgroundColor: 'rgba(255,255,255,0.14)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer'
+              }}
+            >
+              {isSidebarOpen ? (
+                <X style={{ width: '20px', height: '20px', color: '#ffffff' }} />
+              ) : (
+                <Menu style={{ width: '20px', height: '20px', color: '#ffffff' }} />
+              )}
+            </button>
+          )}
+          <div style={{ width: '46px', height: '46px', flexShrink: 0, backgroundColor: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #bfe1f9', boxShadow: '0 0 0 3px rgba(255,255,255,0.15), 0 3px 10px rgba(0,0,0,0.15)' }}>
             <Hand style={{ width: '22px', height: '22px', color: '#0d47a1' }} />
           </div>
-          <div>
-            <h1 style={{ fontSize: '20px', fontWeight: '800', color: '#ffffff', margin: 0, letterSpacing: '0.2px' }}>
+          <div style={{ minWidth: 0, overflow: 'hidden' }}>
+            <h1 style={{ fontSize: '20px', fontWeight: '800', color: '#ffffff', margin: 0, letterSpacing: '0.2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               SignBridge <span style={{ fontWeight: '500', opacity: 0.85 }}>By IT-HTC</span>
             </h1>
-            <p style={{ fontSize: '12px', fontWeight: '500', color: '#dbeeff', margin: '1px 0 0 0' }}>
+            <p style={{ fontSize: '12px', fontWeight: '500', color: '#dbeeff', margin: '1px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               นวัตกรรมระบบช่วยเรียนรู้ภาษาเขียนไทยสำหรับเด็กบกพร่องทางการได้ยิน
             </p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.28)', borderRadius: '9999px', padding: '6px 14px', backdropFilter: 'blur(6px)' }}>
+        {/* บนจอมือถือ/แท็บเล็ตย่อเหลือแค่จุดสี ไม่ใส่ข้อความ เพราะพื้นที่แคบจนไปทับชื่อแอพ */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.28)', borderRadius: '9999px', padding: isMobileView ? '8px' : '6px 14px', backdropFilter: 'blur(6px)', flexShrink: 0 }}>
           <span
             style={{
               width: '9px',
@@ -488,23 +613,51 @@ export const StudentDashboard: React.FC = () => {
             }}
             className={isCameraOn && wsStatus === 'connected' ? 'sb-live-dot' : ''}
           />
-          <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#ffffff' }}>
-            {!isCameraOn
-              ? 'กล้องปิดอยู่'
-              : wsStatus === 'connected'
-                ? 'ระบบพร้อมใช้งาน'
-                : wsStatus === 'connecting'
-                  ? 'กำลังเชื่อมต่อเซิร์ฟเวอร์...'
-                  : 'ขาดการเชื่อมต่อเซิร์ฟเวอร์'}
-          </span>
+          {!isMobileView && (
+            <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#ffffff', whiteSpace: 'nowrap' }}>
+              {!isCameraOn
+                ? 'กล้องปิดอยู่'
+                : wsStatus === 'connected'
+                  ? 'ระบบพร้อมใช้งาน'
+                  : wsStatus === 'connecting'
+                    ? 'กำลังเชื่อมต่อเซิร์ฟเวอร์...'
+                    : 'ขาดการเชื่อมต่อเซิร์ฟเวอร์'}
+            </span>
+          )}
         </div>
       </header>
 
       {/* MAIN BODY */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
+
+        {/* SIDEBAR BACKDROP (เฉพาะโหมด mobile ตอนเปิดเมนู) */}
+        {isMobileView && isSidebarOpen && (
+          <div
+            onClick={() => setIsSidebarOpen(false)}
+            style={{ position: 'fixed', top: '72px', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.45)', zIndex: 39 }}
+          />
+        )}
+
         {/* SIDEBAR */}
-        <aside style={{ width: '210px', background: 'linear-gradient(180deg, #ffffff 0%, #f6faff 100%)', borderRight: '1px solid #dce8f7', display: 'flex', flexDirection: 'column', padding: '16px 12px', flexShrink: 0, boxShadow: '6px 0 24px -12px rgba(13,71,161,0.18)', position: 'relative', zIndex: 1 }}>
+        <aside
+          style={{
+            width: '210px',
+            background: 'linear-gradient(180deg, #ffffff 0%, #f6faff 100%)',
+            borderRight: '1px solid #dce8f7',
+            display: 'flex',
+            flexDirection: 'column',
+            padding: '16px 12px',
+            flexShrink: 0,
+            boxShadow: isMobileView ? '8px 0 24px -8px rgba(13,71,161,0.3)' : '6px 0 24px -12px rgba(13,71,161,0.18)',
+            position: isMobileView ? 'fixed' : 'relative',
+            top: isMobileView ? '72px' : undefined,
+            left: 0,
+            height: isMobileView ? 'calc(100dvh - 72px)' : undefined,
+            transform: isMobileView ? (isSidebarOpen ? 'translateX(0)' : 'translateX(-100%)') : 'none',
+            transition: isMobileView ? 'transform 0.25s ease' : undefined,
+            zIndex: 40
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0d47a1', marginBottom: '14px', padding: '0 6px' }}>
             <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#e8f1fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Grid style={{ width: '15px', height: '15px', color: '#0d47a1' }} />
@@ -528,6 +681,7 @@ export const StudentDashboard: React.FC = () => {
                     setActiveTab(key);
                     setSelectedCategory(null);
                     setSelectedWord(null);
+                    if (isMobileView) setIsSidebarOpen(false);
                   }}
                   className={`sb-nav-item ${isActive ? 'sb-nav-item-active' : 'sb-nav-item-inactive'}`}
                   style={{
@@ -577,15 +731,118 @@ export const StudentDashboard: React.FC = () => {
         </aside>
 
         {/* CONTENT AREA */}
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'radial-gradient(circle at 100% 0%, #f0f7ff 0%, #eaf1fb 45%)', padding: '24px' }}>
-          
+        {/* overflow: 'auto' เสมอ (ไม่ใช่แค่ตอน isMobileView) ไว้เป็นทางเลื่อนสำรอง — ตอนเนื้อหาพอดี
+            จอ auto จะไม่โชว์ scrollbar เลยไม่ต่างจาก hidden แต่ถ้าจอไหนเนื้อหาเกิน (เช่น แท็บเล็ตขนาด
+            กลางที่ grid คำศัพท์ยังยัดไม่พอ) จะเลื่อนดูได้แทนที่จะถูกตัดจนมองไม่เห็นเฉยๆ */}
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', WebkitOverflowScrolling: 'touch', background: 'radial-gradient(circle at 100% 0%, #f0f7ff 0%, #eaf1fb 45%)', padding: isMobileView ? '12px' : '24px' }}>
+
           {/* 1. หน้าหลัก */}
-          {activeTab === 'home' && (
+          {activeTab === 'home' && (isMobileView ? (
+            // ไม่ใส่ flex:1/minHeight:0 ที่นี่โดยตั้งใจ: ให้ความสูงคำนวณจาก content จริง แล้วปล่อยให้
+            // <main> ด้านบน (ซึ่งตั้ง overflow:auto ไว้แล้ว) เป็นตัวเลื่อนเพียงจุดเดียว ถ้าตั้ง flex:1
+            // + minHeight:0 ตรงนี้ด้วย จะกลายเป็นบีบอัด content ให้พอดีกรอบแทนการล้นแล้วเลื่อนดูได้
+            <div className="sb-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+              {/* กล่องสถานะผลตรวจจับ (ย่อ) */}
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '18px', padding: '12px 14px', flexShrink: 0, boxShadow: '0 6px 16px -10px rgba(13,71,161,0.16)' }}>
+                {!isRecordingSentence ? (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8' }}>คำเดี่ยว (Single Word)</span>
+                      {isCameraOn && previousWord && (
+                        <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#94a3b8' }}>
+                          ล่าสุด: <span style={{ color: '#64748b' }}>{previousWord}</span>
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '3px' }}>
+                      {isCameraOn && singleWordResult ? (
+                        <>
+                          <span style={{ fontSize: '22px', fontWeight: '800', color: '#0d47a1' }}>{singleWordResult.word}</span>
+                          <span style={{ fontSize: '12.5px', fontWeight: 'bold', color: '#16a34a' }}>({singleWordResult.confidence}%)</span>
+                        </>
+                      ) : (
+                        <span style={{ color: '#94a3b8', letterSpacing: '3px', fontSize: '15px', fontFamily: 'monospace' }}>--------</span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Flag style={{ width: '12px', height: '12px', color: '#0d47a1', flexShrink: 0 }} />
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b', flexShrink: 0 }}>ไวยากรณ์ไทย:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: transformedWords.length > 0 ? '#0d47a1' : '#94a3b8' }}>
+                        {transformedWords.length > 0 ? transformedWords.join(' - ') : '-'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Hand style={{ width: '12px', height: '12px', color: '#0d47a1', flexShrink: 0 }} />
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b', flexShrink: 0 }}>ไวยากรณ์มือ:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: recordedWords.length > 0 ? '#0d47a1' : '#94a3b8' }}>
+                        {recordedWords.length > 0 ? recordedWords.join(' - ') : '-'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* กล่องแสดงภาพกล้อง: ใช้ aspect-ratio แทน flex:1 เพื่อให้ความสูงรวมของหน้าคำนวณได้แน่นอน
+                  (ไม่งั้นทั้งกล่องนี้และ toolbar ด้านล่างจะแย่งพื้นที่กันจนบางส่วนหลุดจอ) */}
+              <div style={{ width: '100%', aspectRatio: '3 / 4', display: 'flex', flexShrink: 0 }}>
+                {cameraBox}
+              </div>
+
+              {/* แถบไอคอนควบคุม: แตะไอคอนเพื่อสั่งงานฟังก์ชันนั้นทันที (แทนการ์ดเต็มจอที่เบียดกันบนมือถือ) */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', flexShrink: 0 }}>
+                <MobileControlButton
+                  icon={Camera}
+                  label={isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
+                  active
+                  variant={isCameraOn ? 'default' : 'danger'}
+                  onClick={toggleCamera}
+                />
+                <MobileControlButton
+                  icon={RefreshCw}
+                  label="สลับกล้อง"
+                  disabled={!isCameraOn}
+                  onClick={switchCamera}
+                />
+                <MobileControlButton
+                  icon={isRecordingSentence ? StopCircle : PlayCircle}
+                  label={isRecordingSentence ? 'แปลผลประโยค' : 'เริ่มอัดประโยค'}
+                  active
+                  variant={isRecordingSentence ? 'danger' : 'success'}
+                  disabled={!isCameraOn}
+                  onClick={toggleSentenceRecording}
+                />
+                <MobileControlButton
+                  icon={RotateCcw}
+                  label="ล้างประโยค"
+                  disabled={!isCameraOn}
+                  onClick={clearSentence}
+                />
+                <MobileControlButton
+                  icon={CloudFog}
+                  label="เบลอพื้นหลัง"
+                  active={isBlurBg}
+                  disabled={!isCameraOn}
+                  onClick={() => setIsBlurBg((v) => !v)}
+                />
+                <MobileControlButton
+                  icon={Bone}
+                  label="แสดงโครงกระดูก"
+                  active={isShowSkeleton}
+                  disabled={!isCameraOn}
+                  onClick={() => setIsShowSkeleton((v) => !v)}
+                />
+              </div>
+            </div>
+          ) : (
             <div className="sb-fade-in" style={{ flex: 1, display: 'flex', gap: '20px', overflow: 'hidden' }}>
-              
+
               {/* ฝั่งซ้าย */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
-                
+
                 {/* กล่องซ้ายบน */}
                 <div style={{ height: '116px', backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '24px', display: 'flex', alignItems: 'stretch', overflow: 'hidden', boxShadow: '0 8px 22px -12px rgba(13,71,161,0.14)', flexShrink: 0 }}>
                   
@@ -671,81 +928,7 @@ export const StudentDashboard: React.FC = () => {
                 </div>
 
                 {/* Display หน้าจอกล้อง Canvas */}
-                <div 
-                  style={{ 
-                    flex: 1, 
-                    backgroundColor: '#000000', 
-                    borderRadius: '32px', 
-                    border: isCameraOn ? '3px solid #0d47a1' : '3px solid #ef4444', 
-                    boxShadow: isCameraOn 
-                      ? '0 0 20px rgba(13, 71, 161, 0.3)' 
-                      : '0 0 20px rgba(239, 68, 68, 0.5)',
-                    position: 'relative', 
-                    overflow: 'hidden', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    transition: 'all 0.3s ease-in-out'
-                  }}
-                >
-                  {isCameraOn && (
-                    <div style={{ position: 'absolute', top: '16px', left: '16px', display: 'flex', alignItems: 'center', gap: '7px', backgroundColor: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '9999px', padding: '6px 14px', zIndex: 3, backdropFilter: 'blur(4px)' }}>
-                      <span className="sb-live-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
-                      <span style={{ fontSize: '12px', fontWeight: '800', color: '#ffffff', letterSpacing: '0.5px' }}>LIVE</span>
-                    </div>
-                  )}
-
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    style={{ display: 'none' }}
-                  />
-
-                  {/* Canvas ซ่อนไว้สำหรับจับภาพจาก video ส่งเข้า Backend โดยตรง (ไม่ผ่าน rAF) */}
-                  <canvas ref={sendCanvasRef} style={{ display: 'none' }} />
-
-                  <canvas
-                    ref={canvasRef}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                      display: isCameraOn ? 'block' : 'none'
-                    }}
-                  />
-
-                  {isCameraOn && isShowSkeleton && skeletonFrame && (
-                    <img
-                      src={skeletonFrame}
-                      alt="โครงกระดูกที่ตรวจจับได้"
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'contain',
-                        zIndex: 2
-                      }}
-                    />
-                  )}
-
-                  {!isCameraOn && (
-                    <div style={{ textAlign: 'center', padding: '16px' }}>
-                      <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
-                        <Camera style={{ width: '24px', height: '24px', color: '#ef4444' }} />
-                      </div>
-                      <p style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '20px', margin: 0, textShadow: '0 0 8px rgba(239,68,68,0.4)' }}>
-                        กรุณากดเปิดกล้อง
-                      </p>
-                      <p style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '20px', margin: '4px 0 0 0', textShadow: '0 0 8px rgba(239,68,68,0.4)' }}>
-                        ก่อนใช้งานระบบ
-                      </p>
-                    </div>
-                  )}
-                </div>
+                {cameraBox}
 
               </div>
 
@@ -966,7 +1149,7 @@ export const StudentDashboard: React.FC = () => {
               </div>
 
             </div>
-          )}
+          ))}
 
           {/* 2. หน้าคลังศัพท์ */}
           {activeTab === 'dict' && (

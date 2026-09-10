@@ -1,17 +1,18 @@
 import React from 'react';
-import { 
-  Heart, 
-  Activity, 
-  HelpCircle, 
-  UserCheck, 
-  Users, 
-  HandHeart, 
-  Clock, 
-  MapPin, 
-  Package, 
+import {
+  Heart,
+  Activity,
+  HelpCircle,
+  UserCheck,
+  Users,
+  HandHeart,
+  Clock,
+  MapPin,
+  Package,
   Sliders,
   BookOpen
 } from 'lucide-react';
+import { useIsMobileView } from '../hooks/useIsMobileView';
 
 interface CategoryItem {
   id: string;
@@ -25,6 +26,11 @@ interface DictionaryPageProps {
 }
 
 export const DictionaryPage: React.FC<DictionaryPageProps> = ({ onSelectCategory }) => {
+  const isMobileView = useIsMobileView();
+  // จอแท็บเล็ต (เช่น iPad แนวนอน) กว้างกว่า breakpoint มือถือ แต่ยังแคบเกินจะอัด 5 คอลัมน์แบบ
+  // desktop ได้พอดี จึงลดเหลือ 3 คอลัมน์ ถ้าเนื้อหาเกินให้ผู้ใช้เลื่อนดูเอง
+  const isTabletView = useIsMobileView(1366);
+  const gridColumns = isMobileView ? 2 : isTabletView ? 3 : 5;
   const categories: CategoryItem[] = [
     { id: '1', name: 'ความรู้สึก', icon: <Heart style={{ width: '40px', height: '40px', color: '#0d47a1' }} />, count: 5 },
     { id: '2', name: 'คำกริยา', icon: <Activity style={{ width: '40px', height: '40px', color: '#0d47a1' }} />, count: 8 },
@@ -47,10 +53,10 @@ export const DictionaryPage: React.FC<DictionaryPageProps> = ({ onSelectCategory
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        padding: '24px',
+        padding: isMobileView ? '16px' : '24px',
         background: 'radial-gradient(circle at 100% 0%, #f0f7ff 0%, #eaf1fb 45%)',
         color: '#1e293b',
-        height: '100%',
+        height: isMobileView ? 'auto' : '100%',
         boxSizing: 'border-box'
       }}
     >
@@ -79,14 +85,15 @@ export const DictionaryPage: React.FC<DictionaryPageProps> = ({ onSelectCategory
         <div style={{ width: '100%', height: '1px', background: 'linear-gradient(90deg, transparent, #dce8f7 15%, #dce8f7 85%, transparent)', marginTop: '18px' }} />
       </div>
 
-      {/* CATEGORY GRID LIST */}
-      <div 
-        style={{ 
-          flex: 1,
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(5, 1fr)', 
-          gridTemplateRows: 'repeat(2, 1fr)',
-          gap: '20px'
+      {/* CATEGORY GRID LIST — บนมือถือ/แท็บเล็ตลดเหลือ 2 คอลัมน์ และปล่อยให้สูงตามเนื้อหาจริง
+          (ไม่บังคับ 2 แถวคงที่แบบ desktop) เพื่อให้หน้าเลื่อนดูที่เหลือได้แทนที่จะถูกบีบจนล้น */}
+      <div
+        style={{
+          flex: isMobileView || isTabletView ? undefined : 1,
+          display: 'grid',
+          gridTemplateColumns: `repeat(${gridColumns}, 1fr)`,
+          gridTemplateRows: isMobileView || isTabletView ? undefined : 'repeat(2, 1fr)',
+          gap: isMobileView ? '12px' : '20px'
         }}
       >
         {categories.map((cat) => (
@@ -98,16 +105,16 @@ export const DictionaryPage: React.FC<DictionaryPageProps> = ({ onSelectCategory
               backgroundColor: '#ffffff',
               border: '1px solid #e3ecf7',
               borderRadius: '24px',
-              padding: '16px',
+              padding: isMobileView ? '14px 10px' : '16px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '14px',
+              gap: isMobileView ? '10px' : '14px',
               cursor: 'pointer',
               transition: 'all 0.3s ease',
               boxShadow: '0 4px 14px rgba(13, 71, 161, 0.06)',
-              height: '100%',
+              height: isMobileView ? undefined : '100%',
               position: 'relative',
               overflow: 'hidden'
             }}
@@ -124,14 +131,14 @@ export const DictionaryPage: React.FC<DictionaryPageProps> = ({ onSelectCategory
           >
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: 'linear-gradient(90deg, #0d47a1, #6fbeef)' }} />
 
-            <div 
-              style={{ 
-                width: '68px', 
-                height: '68px', 
-                background: 'linear-gradient(160deg, #eff6ff 0%, #dbeafe 100%)', 
-                borderRadius: '50%', 
-                display: 'flex', 
-                alignItems: 'center', 
+            <div
+              style={{
+                width: isMobileView ? '52px' : '68px',
+                height: isMobileView ? '52px' : '68px',
+                background: 'linear-gradient(160deg, #eff6ff 0%, #dbeafe 100%)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
                 border: '1px solid #dbeafe',
                 flexShrink: 0
@@ -140,8 +147,8 @@ export const DictionaryPage: React.FC<DictionaryPageProps> = ({ onSelectCategory
               {cat.icon}
             </div>
 
-            <div style={{ textAlign: 'center' }}>
-              <span style={{ fontSize: '17px', fontWeight: 800, color: '#0d47a1', display: 'block', whiteSpace: 'nowrap' }}>
+            <div style={{ textAlign: 'center', maxWidth: '100%' }}>
+              <span style={{ fontSize: isMobileView ? '14px' : '17px', fontWeight: 800, color: '#0d47a1', display: 'block', whiteSpace: isMobileView ? 'normal' : 'nowrap' }}>
                 {cat.name}
               </span>
               <span

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowLeft, BookOpen, Hash } from 'lucide-react';
+import { useIsMobileView } from '../hooks/useIsMobileView';
 
 interface CategoryDetailPageProps {
   categoryName: string;
@@ -25,6 +26,11 @@ export const CategoryDetailPage: React.FC<CategoryDetailPageProps> = ({
   onBack,
   onSelectWord,
 }) => {
+  const isMobileView = useIsMobileView();
+  // จอแท็บเล็ต (เช่น iPad แนวนอน) กว้างกว่า breakpoint มือถือ แต่ยังแคบเกินจะอัด 5 คอลัมน์แบบ
+  // desktop ได้พอดี จึงลดเหลือ 3 คอลัมน์ ถ้าเนื้อหาเกินให้ผู้ใช้เลื่อนดูเอง
+  const isTabletView = useIsMobileView(1366);
+  const gridColumns = isMobileView ? 2 : isTabletView ? 3 : 5;
   const words = wordsData[categoryName] || [];
 
   return (
@@ -34,10 +40,10 @@ export const CategoryDetailPage: React.FC<CategoryDetailPageProps> = ({
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        padding: '24px',
+        padding: isMobileView ? '16px' : '24px',
         background: 'radial-gradient(circle at 100% 0%, #f0f7ff 0%, #eaf1fb 45%)',
         color: '#1e293b',
-        height: '100%',
+        height: isMobileView ? 'auto' : '100%',
         boxSizing: 'border-box'
       }}
     >
@@ -102,17 +108,18 @@ export const CategoryDetailPage: React.FC<CategoryDetailPageProps> = ({
 
       <div style={{ width: '100%', height: '1px', background: 'linear-gradient(90deg, transparent, #dce8f7 15%, #dce8f7 85%, transparent)', marginBottom: '18px', flexShrink: 0 }} />
 
-      {/* WORD GRID LIST */}
+      {/* WORD GRID LIST — บนมือถือ/แท็บเล็ตลดเหลือ 2 คอลัมน์ ปล่อยความสูงตามเนื้อหาจริงแล้วให้
+          หน้า (ไม่ใช่ grid นี้เอง) เป็นตัวเลื่อน เพื่อเลี่ยงปัญหา flex:1 + overflow ซ้อนกันสองชั้น */}
       {words.length > 0 ? (
         <div
           className="sb-scroll"
           style={{
-            flex: 1,
+            flex: isMobileView || isTabletView ? undefined : 1,
             display: 'grid',
-            gridTemplateColumns: 'repeat(5, 1fr)',
-            gridTemplateRows: 'repeat(2, 1fr)',
-            gap: '20px',
-            overflowY: 'auto'
+            gridTemplateColumns: `repeat(${gridColumns}, 1fr)`,
+            gridTemplateRows: isMobileView || isTabletView ? undefined : 'repeat(2, 1fr)',
+            gap: isMobileView ? '12px' : '20px',
+            overflowY: isMobileView || isTabletView ? 'visible' : 'auto'
           }}
         >
           {words.map((word, index) => (
@@ -124,16 +131,16 @@ export const CategoryDetailPage: React.FC<CategoryDetailPageProps> = ({
                 backgroundColor: '#ffffff',
                 border: '1px solid #e3ecf7',
                 borderRadius: '24px',
-                padding: '16px',
+                padding: isMobileView ? '14px 10px' : '16px',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '14px',
+                gap: isMobileView ? '10px' : '14px',
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
                 boxShadow: '0 4px 14px rgba(13, 71, 161, 0.06)',
-                height: '100%',
+                height: isMobileView ? undefined : '100%',
                 position: 'relative',
                 overflow: 'hidden'
               }}
@@ -152,8 +159,8 @@ export const CategoryDetailPage: React.FC<CategoryDetailPageProps> = ({
 
               <div
                 style={{
-                  width: '68px',
-                  height: '68px',
+                  width: isMobileView ? '52px' : '68px',
+                  height: isMobileView ? '52px' : '68px',
                   background: 'linear-gradient(160deg, #eff6ff 0%, #dbeafe 100%)',
                   borderRadius: '50%',
                   display: 'flex',
@@ -163,11 +170,11 @@ export const CategoryDetailPage: React.FC<CategoryDetailPageProps> = ({
                   flexShrink: 0
                 }}
               >
-                <BookOpen style={{ width: '40px', height: '40px', color: '#0d47a1' }} />
+                <BookOpen style={{ width: isMobileView ? '28px' : '40px', height: isMobileView ? '28px' : '40px', color: '#0d47a1' }} />
               </div>
 
-              <div style={{ textAlign: 'center' }}>
-                <span style={{ fontSize: '17px', fontWeight: 800, color: '#0d47a1', display: 'block', whiteSpace: 'nowrap' }}>
+              <div style={{ textAlign: 'center', maxWidth: '100%' }}>
+                <span style={{ fontSize: isMobileView ? '14px' : '17px', fontWeight: 800, color: '#0d47a1', display: 'block', whiteSpace: isMobileView ? 'normal' : 'nowrap' }}>
                   {word}
                 </span>
               </div>

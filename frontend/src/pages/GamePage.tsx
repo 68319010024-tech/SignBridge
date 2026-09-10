@@ -1,19 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Gamepad2, 
-  Play, 
-  RefreshCw, 
-  CheckCircle2, 
+import {
+  Gamepad2,
+  Play,
+  RefreshCw,
+  CheckCircle2,
   XCircle,
-  Award, 
+  Award,
   Zap,
   Camera,
   Flag,
   Hand,
   Timer,
-  Radar
+  Radar,
+  CloudFog,
+  Bone
 } from 'lucide-react';
 import { resolveWsUrl } from '../services/wsConfig';
+import { useIsMobileView } from '../hooks/useIsMobileView';
+import { MobileControlButton } from '../components/common/MobileControlButton';
 
 const WS_URL = resolveWsUrl();
 const FRAME_SEND_INTERVAL_MS = 100;
@@ -198,6 +202,10 @@ interface GamePageProps {
 }
 
 export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
+  const isMobileView = useIsMobileView();
+  // จอแท็บเล็ต (เช่น iPad แนวนอน) ยังใช้ layout ฝั่งซ้าย/ขวาแบบ desktop อยู่ (ไม่ต้องสแต็กแนวตั้ง)
+  // แต่สูงไม่พอให้แผงควบคุมขวา 5 กล่องพอดีเป๊ะแบบจอใหญ่ เลยต้องเปิด scroll ให้แถวนี้ไว้เป็นทางเลือก
+  const isTabletView = useIsMobileView(1366);
   const [gameState, setGameState] = useState<'select' | 'playing' | 'result'>('select');
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [hoveredDiff, setHoveredDiff] = useState<Difficulty | null>(null);
@@ -648,8 +656,134 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
     return () => clearInterval(timer);
   }, [gameState, isTimerRunning, timeLeft]);
 
+  // กล่องแสดงภาพกล้อง (ใช้ร่วมกันทั้ง layout desktop และ mobile เหมือนกับหน้า Student)
+  const gameCameraBox = (
+    <div
+      style={{
+        flex: 1,
+        backgroundColor: '#000000',
+        borderRadius: '32px',
+        border: lastResultStatus === 'correct'
+          ? '4px solid #10b981'
+          : lastResultStatus === 'wrong'
+          ? '4px solid #ef4444'
+          : '3px solid #0d47a1',
+        boxShadow: lastResultStatus === 'correct'
+          ? '0 0 30px rgba(16, 185, 129, 0.8)'
+          : lastResultStatus === 'wrong'
+          ? '0 0 30px rgba(239, 68, 68, 0.8)'
+          : '0 0 20px rgba(13, 71, 161, 0.3)',
+        position: 'relative',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'border 0.3s ease, box-shadow 0.3s ease'
+      }}
+    >
+      <video ref={videoRef} autoPlay playsInline muted style={{ display: 'none' }} />
+
+      <canvas
+        ref={canvasRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          display: isCameraOn ? 'block' : 'none'
+        }}
+      />
+
+      {isCameraOn && isShowSkeleton && skeletonFrame && (
+        <img
+          src={skeletonFrame}
+          alt="โครงกระดูกที่ตรวจจับได้"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            zIndex: 10,
+            pointerEvents: 'none'
+          }}
+        />
+      )}
+
+      {/* MODE + LIVE BADGE */}
+      {isCameraOn && (
+        <div style={{ position: 'absolute', top: '16px', left: '16px', display: 'flex', alignItems: 'center', gap: '7px', backgroundColor: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '9999px', padding: '6px 14px', zIndex: 15, backdropFilter: 'blur(4px)' }}>
+          <span className="sb-pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: difficultyMeta[difficulty].color, boxShadow: `0 0 6px ${difficultyMeta[difficulty].color}` }} />
+          <span style={{ fontSize: '12px', fontWeight: 800, color: '#ffffff' }}>{difficultyMeta[difficulty].label}</span>
+        </div>
+      )}
+
+      {!isCameraOn && (
+        <div style={{ textAlign: 'center', padding: '16px' }}>
+          <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
+            <Camera style={{ width: '24px', height: '24px', color: '#ef4444' }} />
+          </div>
+          <p style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '20px', margin: 0, textShadow: '0 0 8px rgba(239,68,68,0.4)' }}>
+            กรุณากดเปิดกล้อง
+          </p>
+          <p style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '20px', margin: '4px 0 0 0', textShadow: '0 0 8px rgba(239,68,68,0.4)' }}>
+            ก่อนใช้งานระบบ
+          </p>
+        </div>
+      )}
+
+      {isCameraOn && !isTimerRunning && (
+        <div style={{ position: 'absolute', backgroundColor: 'rgba(255,255,255,0.94)', padding: '16px 28px', borderRadius: '24px', border: '2px solid #0d47a1', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', zIndex: 10 }}>
+          <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#0d47a1', margin: 0 }}>
+            กดปุ่ม START สีน้ำเงินทางขวามือเพื่อเริ่มเกมส์!
+          </p>
+        </div>
+      )}
+
+      {/* ปุ่มจำลองทดสอบระบบ */}
+      {isCameraOn && isTimerRunning && (
+        <div style={{ position: 'absolute', bottom: '20px', display: 'flex', gap: '12px', zIndex: 10 }}>
+          <button
+            onClick={handleCorrectAnswer}
+            className="sb-sim-btn"
+            style={{
+              backgroundColor: 'rgba(16, 185, 129, 0.9)',
+              border: '1px solid #ffffff',
+              color: '#ffffff',
+              padding: '8px 20px',
+              borderRadius: '9999px',
+              fontWeight: 'bold',
+              fontSize: '13px',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+            }}
+          >
+            จำลองภาษามือถูกต้อง
+          </button>
+          <button
+            onClick={handleWrongAnswer}
+            className="sb-sim-btn"
+            style={{
+              backgroundColor: 'rgba(239, 68, 68, 0.9)',
+              border: '1px solid #ffffff',
+              color: '#ffffff',
+              padding: '8px 20px',
+              borderRadius: '9999px',
+              fontWeight: 'bold',
+              fontSize: '13px',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+            }}
+          >
+            จำลองทำผิด
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '24px', background: 'radial-gradient(circle at 100% 0%, #f0f7ff 0%, #eaf1fb 45%)', color: '#1e293b', height: '100%', boxSizing: 'border-box' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: isMobileView ? '16px' : '24px', background: 'radial-gradient(circle at 100% 0%, #f0f7ff 0%, #eaf1fb 45%)', color: '#1e293b', height: isMobileView ? 'auto' : '100%', boxSizing: 'border-box' }}>
 
       <style>{`
         @keyframes sb-game-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -669,26 +803,38 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
       {/* Canvas สำหรับประมวลผลส่งเข้า Backend */}
       <canvas ref={sendCanvasRef} style={{ display: 'none' }} />
 
-      {/* 1. หน้าเลือกโหมดการเล่น */}
+      {/* 1. หน้าเลือกโหมดการเล่น — บนมือถือ/แท็บเล็ตวางการ์ดเรียงแนวตั้งแทนแถวแนวนอน และไม่บังคับ
+          จัดกึ่งกลางแนวตั้งแบบเต็มจอ (ไม่งั้นบนจอเตี้ยเนื้อหาจะโดนตัดจนกดปุ่มเริ่มเกมไม่ได้) */}
       {gameState === 'select' && (
-        <div className="sb-game-fade" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '32px' }}>
+        <div
+          className="sb-game-fade"
+          style={{
+            flex: isMobileView ? undefined : 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: isMobileView ? 'flex-start' : 'center',
+            gap: isMobileView ? '24px' : '32px',
+            padding: isMobileView ? '12px 0' : 0
+          }}
+        >
           <div style={{ textAlign: 'center' }}>
-            <div style={{ width: '84px', height: '84px', background: 'linear-gradient(160deg, #eff6ff 0%, #dbeafe 100%)', border: '2px solid #0d47a1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px auto', boxShadow: '0 8px 24px rgba(13, 71, 161, 0.2)' }}>
-              <Gamepad2 style={{ width: '44px', height: '44px', color: '#0d47a1' }} />
+            <div style={{ width: isMobileView ? '64px' : '84px', height: isMobileView ? '64px' : '84px', background: 'linear-gradient(160deg, #eff6ff 0%, #dbeafe 100%)', border: '2px solid #0d47a1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px auto', boxShadow: '0 8px 24px rgba(13, 71, 161, 0.2)' }}>
+              <Gamepad2 style={{ width: isMobileView ? '32px' : '44px', height: isMobileView ? '32px' : '44px', color: '#0d47a1' }} />
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '9999px', padding: '4px 14px', marginBottom: '10px', boxShadow: '0 4px 12px -6px rgba(13,71,161,0.18)' }}>
               <Zap style={{ width: '13px', height: '13px', color: '#0d47a1' }} />
               <span style={{ fontSize: '12px', fontWeight: 700, color: '#0d47a1' }}>โหมดฝึกฝน</span>
             </div>
-            <h2 style={{ fontSize: '32px', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+            <h2 style={{ fontSize: isMobileView ? '22px' : '32px', fontWeight: 800, color: '#1e293b', margin: 0 }}>
               เกมส์ทบทวนไวยากรณ์ภาษามือ
             </h2>
-            <p style={{ fontSize: '16px', color: '#64748b', marginTop: '8px' }}>
+            <p style={{ fontSize: isMobileView ? '14px' : '16px', color: '#64748b', marginTop: '8px' }}>
               เลือกโหมดการเล่นที่ต้องการฝึกฝน
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '24px' }}>
+          <div style={{ display: 'flex', flexDirection: isMobileView ? 'column' : 'row', gap: isMobileView ? '14px' : '24px', width: isMobileView ? '100%' : undefined, maxWidth: isMobileView ? '360px' : undefined }}>
             {(['easy', 'medium', 'hard'] as Difficulty[]).map((diff) => {
               const meta = difficultyMeta[diff];
               const isHovered = hoveredDiff === diff;
@@ -699,30 +845,33 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
                   onMouseEnter={() => setHoveredDiff(diff)}
                   onMouseLeave={() => setHoveredDiff(null)}
                   style={{
-                    width: '208px',
-                    padding: '28px 20px',
+                    width: isMobileView ? '100%' : '208px',
+                    padding: isMobileView ? '18px 20px' : '28px 20px',
                     borderRadius: '24px',
                     border: isHovered ? `2px solid ${meta.color}` : '1px solid #e3ecf7',
                     backgroundColor: '#ffffff',
                     color: isHovered ? meta.color : '#1e293b',
                     cursor: 'pointer',
                     display: 'flex',
-                    flexDirection: 'column',
+                    flexDirection: isMobileView ? 'row' : 'column',
                     alignItems: 'center',
-                    gap: '12px',
+                    gap: isMobileView ? '16px' : '12px',
                     transition: 'all 0.3s ease',
                     transform: isHovered ? 'translateY(-6px)' : 'translateY(0)',
                     boxShadow: isHovered ? `0 14px 30px ${meta.glow}` : '0 4px 14px rgba(13, 71, 161, 0.06)',
                     position: 'relative',
-                    overflow: 'hidden'
+                    overflow: 'hidden',
+                    boxSizing: 'border-box'
                   }}
                 >
                   <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', backgroundColor: meta.color, opacity: isHovered ? 1 : 0.35, transition: 'opacity 0.3s ease' }} />
-                  <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: isHovered ? `${meta.color}1a` : '#f4f8fd', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background-color 0.3s ease' }}>
-                    <Zap style={{ width: '32px', height: '32px', color: meta.color }} />
+                  <div style={{ width: isMobileView ? '48px' : '64px', height: isMobileView ? '48px' : '64px', flexShrink: 0, borderRadius: '50%', backgroundColor: isHovered ? `${meta.color}1a` : '#f4f8fd', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background-color 0.3s ease' }}>
+                    <Zap style={{ width: isMobileView ? '24px' : '32px', height: isMobileView ? '24px' : '32px', color: meta.color }} />
                   </div>
-                  <span style={{ fontSize: '18px', fontWeight: 800 }}>{meta.label}</span>
-                  <span style={{ fontSize: '13px', color: '#64748b', textAlign: 'center' }}>{meta.sub}</span>
+                  <div style={{ textAlign: isMobileView ? 'left' : 'center' }}>
+                    <span style={{ fontSize: '18px', fontWeight: 800, display: 'block' }}>{meta.label}</span>
+                    <span style={{ fontSize: '13px', color: '#64748b' }}>{meta.sub}</span>
+                  </div>
                 </button>
               );
             })}
@@ -730,10 +879,154 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
         </div>
       )}
 
-      {/* 2. หน้าเล่นเกมส์หลัก */}
-      {gameState === 'playing' && (
-        <div className="sb-game-fade" style={{ flex: 1, display: 'flex', gap: '20px', overflow: 'hidden' }}>
-          
+      {/* 2. หน้าเล่นเกมส์หลัก — บนมือถือ/แท็บเล็ตใช้ layout สแต็กแนวตั้ง + ปุ่มไอคอนย่อ
+          (เหมือนหน้า Student) แทนแผงควบคุม 220px คงที่ที่ใช้งานไม่ได้บนจอแคบ */}
+      {gameState === 'playing' && (isMobileView ? (
+        <div className="sb-game-fade" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+
+          {/* SYNTAX BOARD (ย่อ) */}
+          <div style={{ backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '18px', padding: '12px 14px', flexShrink: 0, boxShadow: '0 6px 16px -10px rgba(13,71,161,0.16)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <Flag style={{ width: '12px', height: '12px', color: '#0d47a1', flexShrink: 0 }} />
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b', flexShrink: 0 }}>
+                {difficulty === 'easy' ? 'ภาษาไทย:' : 'ไวยากรณ์ไทย:'}
+              </span>
+              {isTimerRunning ? (
+                difficulty === 'easy' ? (
+                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#0d47a1' }}>{currentQ.wordOnly}</span>
+                ) : (
+                  currentQ.thaiGrammar.map((item, idx) => (
+                    <React.Fragment key={idx}>
+                      <span style={{ fontSize: '13px', fontWeight: 'bold', color: item.color }}>{item.word} ({getSignOrderIndex(currentQ, item.word)})</span>
+                      {idx < currentQ.thaiGrammar.length - 1 && <span style={{ color: '#94a3b8' }}>-</span>}
+                    </React.Fragment>
+                  ))
+                )
+              ) : (
+                <span style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 'bold' }}>กด START เพื่อเริ่มเกมส์</span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <Hand style={{ width: '12px', height: '12px', color: '#0d47a1', flexShrink: 0 }} />
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b', flexShrink: 0 }}>
+                {difficulty === 'easy' ? 'ภาษามือ:' : 'ไวยากรณ์มือ:'}
+              </span>
+              {isTimerRunning ? (
+                difficulty === 'easy' ? (
+                  <span style={{ fontSize: '13px', fontWeight: 'bold', color: wordEvent?.word ? '#0d47a1' : '#94a3b8' }}>
+                    {wordEvent?.word || '------------'}
+                  </span>
+                ) : (
+                  currentQ.signGrammar.map((_, idx) => {
+                    const isLocked = idx < lockedWords.length;
+                    const isLiveSlot = idx === lockedWords.length;
+                    const liveWord = isLiveSlot ? wordEvent?.word : null;
+                    const display = isLocked ? lockedWords[idx] : liveWord;
+                    return (
+                      <React.Fragment key={idx}>
+                        {display ? (
+                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: isLocked ? '#0d47a1' : '#f97316' }}>{display}</span>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontSize: '13px', fontFamily: 'monospace' }}>__</span>
+                        )}
+                        {idx < currentQ.signGrammar.length - 1 && <span style={{ color: '#94a3b8' }}>-</span>}
+                      </React.Fragment>
+                    );
+                  })
+                )
+              ) : (
+                <span style={{ color: '#94a3b8', fontSize: '12px', fontWeight: 'bold' }}>กด START เพื่อเริ่มเกมส์</span>
+              )}
+            </div>
+          </div>
+
+          {/* WEBCAM DISPLAY */}
+          <div style={{ width: '100%', aspectRatio: '3 / 4', display: 'flex', flexShrink: 0 }}>
+            {gameCameraBox}
+          </div>
+
+          {/* สถิติแบบย่อ: เวลา / คะแนน / สถานะการตรวจจับ */}
+          <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+            <div style={{ flex: 1, backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '14px', padding: '8px', textAlign: 'center', boxShadow: '0 4px 12px -8px rgba(13,71,161,0.18)' }}>
+              <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#94a3b8' }}>เวลา</div>
+              <div style={{ fontSize: '17px', fontWeight: 800, color: timeLeft <= 10 ? '#ef4444' : '#1e293b' }}>{timeLeft}s</div>
+            </div>
+            <div style={{ flex: 1, backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '14px', padding: '8px', textAlign: 'center', boxShadow: '0 4px 12px -8px rgba(13,71,161,0.18)' }}>
+              <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#94a3b8' }}>คะแนน</div>
+              <div style={{ fontSize: '17px', fontWeight: 800, color: '#1e293b' }}>{score}</div>
+            </div>
+            <div style={{ flex: 1.5, backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '14px', padding: '8px', textAlign: 'center', boxShadow: '0 4px 12px -8px rgba(13,71,161,0.18)' }}>
+              <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#94a3b8' }}>สถานะ</div>
+              <div style={{ fontSize: '11.5px', fontWeight: 800, color: lastResultStatus === 'correct' ? '#10b981' : lastResultStatus === 'wrong' ? '#ef4444' : isTimerRunning ? '#0d47a1' : '#64748b' }}>
+                {lastResultStatus === 'correct' ? 'ถูกต้อง!' : lastResultStatus === 'wrong' ? 'ผิด! ลองใหม่' : isTimerRunning ? 'กำลังรอ...' : 'กด START'}
+              </div>
+            </div>
+          </div>
+
+          {/* ปุ่ม START เต็มความกว้าง */}
+          <button
+            onClick={handlePressStart}
+            disabled={isTimerRunning}
+            className="sb-primary-btn"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              width: '100%',
+              padding: '13px',
+              borderRadius: '9999px',
+              border: 'none',
+              fontWeight: 'bold',
+              fontSize: '15px',
+              cursor: isTimerRunning ? 'not-allowed' : 'pointer',
+              background: isTimerRunning ? '#e2e8f0' : 'linear-gradient(135deg, #0d47a1, #1662c4)',
+              color: isTimerRunning ? '#94a3b8' : '#ffffff',
+              boxShadow: isTimerRunning ? 'none' : '0 6px 18px rgba(13, 71, 161, 0.35)',
+              flexShrink: 0
+            }}
+          >
+            <Play style={{ width: '18px', height: '18px', fill: isTimerRunning ? '#94a3b8' : '#ffffff' }} />
+            {isTimerRunning ? 'กำลังเล่น' : 'START'}
+          </button>
+
+          {/* แถบไอคอนควบคุมกล้อง */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            <MobileControlButton
+              icon={Camera}
+              label={isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
+              active
+              variant={isCameraOn ? 'default' : 'danger'}
+              onClick={toggleCamera}
+            />
+            <MobileControlButton
+              icon={RefreshCw}
+              label="สลับกล้อง"
+              disabled={!isCameraOn}
+              onClick={switchCamera}
+            />
+            <MobileControlButton
+              icon={CloudFog}
+              label="เบลอพื้นหลัง"
+              active={isBlurBg}
+              disabled={!isCameraOn}
+              onClick={() => setIsBlurBg((v) => !v)}
+            />
+            <MobileControlButton
+              icon={Bone}
+              label="แสดงโครงกระดูก"
+              active={isShowSkeleton}
+              disabled={!isCameraOn}
+              onClick={() => setIsShowSkeleton((v) => !v)}
+            />
+          </div>
+        </div>
+      ) : (
+        /* จอ desktop จริง (>1366px) คง overflow: hidden ไว้ตามเดิม เพราะสูงพอให้แผงขวาพอดีเป๊ะอยู่แล้ว
+           ส่วนจอแท็บเล็ต (iPad แนวนอน) เปิด auto ไว้เป็นทางเลื่อนสำรอง กันแผงขวาโดนตัดจนกดใช้ไม่ได้ */
+        <div className="sb-game-fade" style={{ flex: 1, display: 'flex', gap: '20px', overflow: isTabletView ? 'auto' : 'hidden', WebkitOverflowScrolling: 'touch' }}>
+
           {/* ฝั่งซ้าย: SYNTAX BOARD (ด้านบน) + WEBCAM DISPLAY (ด้านล่าง) */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
             
@@ -823,134 +1116,117 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
             </div>
 
             {/* WEBCAM DISPLAY */}
-            <div 
-              style={{ 
-                flex: 1, 
-                backgroundColor: '#000000', 
-                borderRadius: '32px', 
-                border: lastResultStatus === 'correct' 
-                  ? '4px solid #10b981' 
-                  : lastResultStatus === 'wrong'
-                  ? '4px solid #ef4444'
-                  : '3px solid #0d47a1', 
-                boxShadow: lastResultStatus === 'correct'
-                  ? '0 0 30px rgba(16, 185, 129, 0.8)'
-                  : lastResultStatus === 'wrong'
-                  ? '0 0 30px rgba(239, 68, 68, 0.8)'
-                  : '0 0 20px rgba(13, 71, 161, 0.3)',
-                position: 'relative', 
-                overflow: 'hidden', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                transition: 'border 0.3s ease, box-shadow 0.3s ease'
-              }}
-            >
-              <video ref={videoRef} autoPlay playsInline muted style={{ display: 'none' }} />
-
-              <canvas
-                ref={canvasRef}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  display: isCameraOn ? 'block' : 'none'
-                }}
-              />
-
-              {isCameraOn && isShowSkeleton && skeletonFrame && (
-                <img
-                  src={skeletonFrame}
-                  alt="โครงกระดูกที่ตรวจจับได้"
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                    zIndex: 10,
-                    pointerEvents: 'none'
-                  }}
-                />
-              )}
-
-              {/* MODE + LIVE BADGE */}
-              {isCameraOn && (
-                <div style={{ position: 'absolute', top: '16px', left: '16px', display: 'flex', alignItems: 'center', gap: '7px', backgroundColor: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '9999px', padding: '6px 14px', zIndex: 15, backdropFilter: 'blur(4px)' }}>
-                  <span className="sb-pulse-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: difficultyMeta[difficulty].color, boxShadow: `0 0 6px ${difficultyMeta[difficulty].color}` }} />
-                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#ffffff' }}>{difficultyMeta[difficulty].label}</span>
-                </div>
-              )}
-
-              {!isCameraOn && (
-                <div style={{ textAlign: 'center', padding: '16px' }}>
-                  <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto' }}>
-                    <Camera style={{ width: '24px', height: '24px', color: '#ef4444' }} />
-                  </div>
-                  <p style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '20px', margin: 0, textShadow: '0 0 8px rgba(239,68,68,0.4)' }}>
-                    กรุณากดเปิดกล้อง
-                  </p>
-                  <p style={{ color: '#ef4444', fontWeight: 'bold', fontSize: '20px', margin: '4px 0 0 0', textShadow: '0 0 8px rgba(239,68,68,0.4)' }}>
-                    ก่อนใช้งานระบบ
-                  </p>
-                </div>
-              )}
-
-              {isCameraOn && !isTimerRunning && (
-                <div style={{ position: 'absolute', backgroundColor: 'rgba(255,255,255,0.94)', padding: '16px 28px', borderRadius: '24px', border: '2px solid #0d47a1', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', zIndex: 10 }}>
-                  <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#0d47a1', margin: 0 }}>
-                    กดปุ่ม START สีน้ำเงินทางขวามือเพื่อเริ่มเกมส์!
-                  </p>
-                </div>
-              )}
-
-              {/* ปุ่มจำลองทดสอบระบบ */}
-              {isCameraOn && isTimerRunning && (
-                <div style={{ position: 'absolute', bottom: '20px', display: 'flex', gap: '12px', zIndex: 10 }}>
-                  <button
-                    onClick={handleCorrectAnswer}
-                    className="sb-sim-btn"
-                    style={{
-                      backgroundColor: 'rgba(16, 185, 129, 0.9)',
-                      border: '1px solid #ffffff',
-                      color: '#ffffff',
-                      padding: '8px 20px',
-                      borderRadius: '9999px',
-                      fontWeight: 'bold',
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-                    }}
-                  >
-                    จำลองภาษามือถูกต้อง
-                  </button>
-                  <button
-                    onClick={handleWrongAnswer}
-                    className="sb-sim-btn"
-                    style={{
-                      backgroundColor: 'rgba(239, 68, 68, 0.9)',
-                      border: '1px solid #ffffff',
-                      color: '#ffffff',
-                      padding: '8px 20px',
-                      borderRadius: '9999px',
-                      fontWeight: 'bold',
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
-                    }}
-                  >
-                    จำลองทำผิด
-                  </button>
-                </div>
-              )}
-            </div>
+            {gameCameraBox}
 
           </div>
 
-          {/* ฝั่งขวา: แผงควบคุม + ปุ่ม START */}
+          {/* ฝั่งขวา: แผงควบคุม + ปุ่ม START — บนแท็บเล็ต (iPad แนวนอน) สลับไปใช้แผงควบคุมแบบย่อ
+              (การ์ดสถิติเล็ก + ปุ่มไอคอน เหมือนโหมดมือถือ) แทน 5 กล่องเต็มของ desktop เพราะสูงจอไม่พอ
+              ให้ 5 กล่องแบบเต็มพอดีเป๊ะ แต่ยังคงอยู่ฝั่งขวาเป็นคอลัมน์แคบเหมือนเดิม ไม่ใช่สแต็กเต็มความกว้าง
+              แบบมือถือ */}
+          {isTabletView ? (
+            // ย้อนกลับไปใช้ดีไซน์แบบย่อ (เวลา/คะแนน + การ์ดสถานะ+START + แถบไอคอนกล้อง) ตามที่ผู้ใช้
+            // ยืนยันไว้ก่อนหน้านี้ เปลี่ยนแค่ลำดับในการ์ดรวม: "สถานะการตรวจจับ" ขึ้นก่อน แล้วปุ่ม START
+            // วงกลมอยู่ด้านล่าง (สลับจากเดิมที่ START อยู่บน)
+            <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: '16px', height: '100%', flexShrink: 0 }}>
+              {/* สูง 116px + gap 16px เท่ากับ "กระดานโจทย์" ฝั่งซ้ายเป๊ะ เพื่อให้กล่องสถานะการตรวจจับ
+                  ที่ตามมาเริ่มตรงกับขอบบนของกล่องกล้องพอดี (ถ้าใช้ flex:1 ที่นี่เหมือนกล่องอื่น ความสูง
+                  จะไม่เท่ากับฝั่งซ้ายที่ fix ไว้ 116px ทำให้ขอบเริ่มเหลื่อมกัน) */}
+              <div style={{ height: '116px', flexShrink: 0, display: 'flex', gap: '8px' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '14px', padding: '8px', textAlign: 'center', boxShadow: '0 4px 12px -8px rgba(13,71,161,0.18)' }}>
+                  <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#94a3b8' }}>เวลา</div>
+                  <div style={{ fontSize: '17px', fontWeight: 800, color: timeLeft <= 10 ? '#ef4444' : '#1e293b' }}>{timeLeft}s</div>
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '14px', padding: '8px', textAlign: 'center', boxShadow: '0 4px 12px -8px rgba(13,71,161,0.18)' }}>
+                  <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#94a3b8' }}>คะแนน</div>
+                  <div style={{ fontSize: '17px', fontWeight: 800, color: '#1e293b' }}>{score}</div>
+                </div>
+              </div>
+
+              {/* กล่องสถานะการตรวจจับ (แยกกล่องต่างหาก ไม่รวมกับปุ่ม START) */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '14px', padding: '8px', boxShadow: '0 4px 12px -8px rgba(13,71,161,0.18)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Radar style={{ width: '10px', height: '10px', color: '#94a3b8' }} />
+                  <span style={{ fontSize: '10px', color: '#64748b' }}>สถานะการตรวจจับ</span>
+                </div>
+                {lastResultStatus === 'correct' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 'bold', fontSize: '12px' }}>
+                    <CheckCircle2 style={{ width: '14px', height: '14px' }} />
+                    <span>ถูกต้อง!</span>
+                  </div>
+                )}
+                {lastResultStatus === 'wrong' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#ef4444', fontWeight: 'bold', fontSize: '12px' }}>
+                    <XCircle style={{ width: '14px', height: '14px' }} />
+                    <span>ผิด! ลองใหม่</span>
+                  </div>
+                )}
+                {!lastResultStatus && (
+                  <span style={{ fontSize: '11px', color: isTimerRunning ? '#0d47a1' : '#64748b', fontWeight: 'bold' }}>
+                    {isTimerRunning ? 'กำลังรอภาษามือ...' : 'กด START เพื่อเริ่ม'}
+                  </span>
+                )}
+              </div>
+
+              {/* กล่องปุ่ม START วงกลม (แยกกล่องต่างหาก) */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px', backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '14px', padding: '8px', boxShadow: '0 4px 12px -8px rgba(13,71,161,0.18)' }}>
+                <button
+                  onClick={handlePressStart}
+                  disabled={isTimerRunning}
+                  style={{
+                    width: '52px',
+                    height: '52px',
+                    borderRadius: '50%',
+                    background: isTimerRunning ? '#e2e8f0' : 'linear-gradient(135deg, #0d47a1, #1662c4)',
+                    border: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: isTimerRunning ? 'not-allowed' : 'pointer',
+                    boxShadow: isTimerRunning ? 'none' : '0 6px 18px rgba(13, 71, 161, 0.45)',
+                    opacity: isTimerRunning ? 0.6 : 1
+                  }}
+                >
+                  <Play style={{ width: '24px', height: '24px', color: isTimerRunning ? '#94a3b8' : '#ffffff', marginLeft: '3px', fill: isTimerRunning ? '#94a3b8' : '#ffffff' }} />
+                </button>
+                <span style={{ fontSize: '11px', fontWeight: 'bold', color: isTimerRunning ? '#94a3b8' : '#0d47a1' }}>
+                  {isTimerRunning ? 'กำลังเล่น' : 'START'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                <MobileControlButton
+                  icon={Camera}
+                  label={isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
+                  active
+                  variant={isCameraOn ? 'default' : 'danger'}
+                  onClick={toggleCamera}
+                />
+                <MobileControlButton
+                  icon={RefreshCw}
+                  label="สลับกล้อง"
+                  disabled={!isCameraOn}
+                  onClick={switchCamera}
+                />
+                <MobileControlButton
+                  icon={CloudFog}
+                  label="เบลอพื้นหลัง"
+                  active={isBlurBg}
+                  disabled={!isCameraOn}
+                  onClick={() => setIsBlurBg((v) => !v)}
+                />
+                <MobileControlButton
+                  icon={Bone}
+                  label="แสดงโครงกระดูก"
+                  active={isShowSkeleton}
+                  disabled={!isCameraOn}
+                  onClick={() => setIsShowSkeleton((v) => !v)}
+                />
+              </div>
+            </div>
+          ) : (
           <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: '14px', height: '100%', flexShrink: 0 }}>
-            
+
             {/* BOX 1: ปุ่ม START วงกลม */}
             <div style={{ backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '24px', padding: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px', boxShadow: '0 8px 20px -12px rgba(13,71,161,0.16)' }}>
               <button
@@ -1153,9 +1429,10 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
             </div>
 
           </div>
+          )}
 
         </div>
-      )}
+      ))}
 
       {/* 3. RESULT OVERLAY */}
       {gameState === 'result' && (
