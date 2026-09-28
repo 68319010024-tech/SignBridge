@@ -13,6 +13,10 @@ interface CameraControlBoxProps {
   onToggleSkeleton: () => void;
   // จอเตี้ย: หัวกล่องเล็กและช่องไฟแคบลง ให้คอลัมน์ขวาไม่ยาวเกินขอบล่างของกล้อง
   compact?: boolean;
+  // iPad แนวนอน: กินที่ว่างที่เหลือทั้งหมดของคอลัมน์ แต่ไม่หดต่ำกว่าเนื้อหา (flex: 1 0 auto) แล้วกระจายที่ว่าง
+  // ให้ปุ่มห่างกัน (space-evenly) — Safari ไม่รองรับ
+  // min-height: min-content ของ flex item กล่องจึงเคยถูกบีบจนปุ่มล่างโดนตัด
+  grow?: boolean;
 }
 
 // กล่องควบคุมกล้อง (ใช้ร่วมกันทั้งหน้าหลักและหน้าทบทวนไวยากรณ์)
@@ -24,10 +28,11 @@ export const CameraControlBox: React.FC<CameraControlBoxProps> = ({
   onToggleBlur,
   isShowSkeleton,
   onToggleSkeleton,
-  compact = false
+  compact = false,
+  grow = false
 }) => (
   // minHeight: overflow: hidden (ไว้ตัดไอคอนลายน้ำ) ทำให้ flex item หดต่ำกว่าเนื้อหาได้ — คืนค่าความสูงขั้นต่ำ = เนื้อหา
-  <div style={{ ...homeCardStyle, flex: 1, minHeight: 'min-content', padding: compact ? '12px 14px' : '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: compact ? '7px' : '10px' }}>
+  <div style={{ ...homeCardStyle, flex: grow ? '1 0 auto' : 1, minHeight: 'min-content', padding: compact ? '12px 14px' : '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: grow ? 'space-evenly' : 'center', gap: compact ? '7px' : '10px' }}>
     <Camera style={{ ...homeWatermarkStyle, width: '96px', height: '96px', right: '-18px', top: '-16px' }} />
     <BoxHeader icon={Camera} title="ควบคุมกล้อง" size={compact ? 'sm' : 'md'} />
 

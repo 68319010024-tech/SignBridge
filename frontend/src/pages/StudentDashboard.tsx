@@ -110,6 +110,8 @@ export const StudentDashboard: React.FC = () => {
   const isTabletLandscape = useIsTabletLandscape();
   // กล่องประโยคล่าสุดโผล่ตอนอัดประโยค — จอเตี้ยต้องบีบปุ่มในกล่องตรวจจับประโยคให้เหลือแถวเดียว
   const compactSentenceButtons = isShortView && isRecordingSentence;
+  // iPad แนวนอน: ปุ่มในกล่องตรวจจับประโยคเรียงแถวเดียวเสมอ กล่องจะเตี้ยลง ให้ที่เหลือกับกล่องควบคุมกล้อง
+  const sentenceButtonsInRow = compactSentenceButtons || isTabletLandscape;
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   // State แสดงโครงกระดูก (skeleton overlay) ที่ backend วาดกลับมาให้
@@ -733,7 +735,7 @@ export const StudentDashboard: React.FC = () => {
   // กล่องประโยคล่าสุด (เฉพาะโหมดอัดประโยค) — ความสูงคงที่แบบกล่องสถานะ กล่องตรวจจับประโยค/ควบคุมกล้อง
   // ด้านล่างเป็น flex:1 จึงหดให้เอง คอลัมน์ขวาจึงยังจบตรงขอบล่างกล้อง
   const lastSentenceBox = isRecordingSentence && (
-    <div style={{ ...homeCardStyle, height: isShortView ? '60px' : '84px', padding: isShortView ? '4px 12px' : '10px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: isShortView ? '3px' : '6px', flexShrink: 0 }}>
+    <div style={{ ...homeCardStyle, height: isTabletLandscape ? '54px' : isShortView ? '60px' : '84px', padding: isShortView ? '4px 12px' : '10px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: isShortView ? '3px' : '6px', flexShrink: 0 }}>
       <MessageSquareText style={{ ...homeWatermarkStyle, width: '70px', height: '70px', right: '-12px', top: '-12px' }} />
       <BoxHeader icon={History} title="ประโยคล่าสุด" size={isShortView ? 'sm' : 'md'} />
       <span
@@ -749,22 +751,22 @@ export const StudentDashboard: React.FC = () => {
 
   // กล่องตรวจจับประโยค
   const sentenceBox = (
-    <div style={{ ...homeCardStyle, flex: 1, minHeight: 'min-content', padding: isShortView ? '12px 14px' : '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: isShortView ? '8px' : '12px' }}>
+    <div style={{ ...homeCardStyle, flex: isTabletLandscape ? '0 0 auto' : 1, minHeight: 'min-content', padding: isTabletLandscape ? '10px 14px' : isShortView ? '12px 14px' : '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: isTabletLandscape ? '6px' : isShortView ? '8px' : '12px' }}>
       <MessageSquareText style={{ ...homeWatermarkStyle, width: '96px', height: '96px', right: '-18px', top: '-16px' }} />
       <BoxHeader icon={MessageSquareText} title="ตรวจจับประโยค" size={isShortView ? 'sm' : 'md'} />
 
       {/* จอเตี้ยตอนอัดประโยค (มีกล่องประโยคล่าสุดเพิ่มมา): วางสองปุ่มเรียงแถวเดียวให้คอลัมน์ไม่เกินขอบกล้อง */}
-      <div style={{ display: 'flex', flexDirection: compactSentenceButtons ? 'row' : 'column', gap: compactSentenceButtons ? '6px' : (isShortView ? '8px' : '12px') }}>
+      <div style={{ display: 'flex', flexDirection: sentenceButtonsInRow ? 'row' : 'column', gap: sentenceButtonsInRow ? '6px' : (isShortView ? '8px' : '12px') }}>
       <button
         onClick={toggleSentenceRecording}
         disabled={!isCameraOn}
         className="sb-primary-btn"
         style={{
           ...homeButtonStyle,
-          padding: compactSentenceButtons ? '7px 8px' : '10px 12px',
-          fontSize: compactSentenceButtons ? '12.5px' : '13.5px',
-          gap: compactSentenceButtons ? '5px' : '8px',
-          flex: compactSentenceButtons ? 1 : undefined,
+          padding: sentenceButtonsInRow ? '7px 8px' : '10px 12px',
+          fontSize: sentenceButtonsInRow ? '12.5px' : '13.5px',
+          gap: sentenceButtonsInRow ? '5px' : '8px',
+          flex: sentenceButtonsInRow ? 1 : undefined,
           minWidth: 0,
           cursor: isCameraOn ? 'pointer' : 'not-allowed',
           background: isRecordingSentence
@@ -782,7 +784,7 @@ export const StudentDashboard: React.FC = () => {
             <PlayCircle style={{ width: '15px', height: '15px', color: '#ffffff' }} />
           )}
         </span>
-        {isRecordingSentence ? (compactSentenceButtons ? 'แปลผล' : 'แปลผลประโยค') : 'เริ่มอัดประโยค'}
+        {isRecordingSentence ? (sentenceButtonsInRow ? 'แปลผล' : 'แปลผลประโยค') : (sentenceButtonsInRow ? 'เริ่มอัด' : 'เริ่มอัดประโยค')}
       </button>
 
       <button
@@ -792,10 +794,10 @@ export const StudentDashboard: React.FC = () => {
         style={{
           ...homeButtonStyle,
           ...homeGhostStyle,
-          padding: compactSentenceButtons ? '6px 8px' : homeGhostStyle.padding,
-          fontSize: compactSentenceButtons ? '12.5px' : '13px',
-          gap: compactSentenceButtons ? '5px' : '8px',
-          flex: compactSentenceButtons ? 1 : undefined,
+          padding: sentenceButtonsInRow ? '6px 8px' : homeGhostStyle.padding,
+          fontSize: sentenceButtonsInRow ? '12.5px' : '13px',
+          gap: sentenceButtonsInRow ? '5px' : '8px',
+          flex: sentenceButtonsInRow ? 1 : undefined,
           minWidth: 0,
           cursor: isCameraOn ? 'pointer' : 'not-allowed',
           opacity: isCameraOn ? 1 : 0.4
@@ -804,7 +806,7 @@ export const StudentDashboard: React.FC = () => {
         <span style={homeGhostIconStyle}>
           <RotateCcw style={{ width: '13px', height: '13px', color: '#0d47a1' }} />
         </span>
-        {compactSentenceButtons ? 'ล้าง' : 'ล้างประโยค'}
+        {sentenceButtonsInRow ? 'ล้าง' : 'ล้างประโยค'}
       </button>
       </div>
     </div>
@@ -821,6 +823,7 @@ export const StudentDashboard: React.FC = () => {
       isShowSkeleton={isShowSkeleton}
       onToggleSkeleton={() => setIsShowSkeleton(!isShowSkeleton)}
       compact={isShortView}
+      grow={isTabletLandscape}
     />
   );
 
@@ -1207,6 +1210,8 @@ export const StudentDashboard: React.FC = () => {
               {/* ฝั่งขวา */}
               <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: isTabletLandscape ? '8px' : isShortView ? '12px' : '16px', flexShrink: 0 }}>
                 {lastWordBox}
+                {/* iPad แนวนอนใช้ช่องไฟ 8px แต่ช่องแรกต้อง 16px เท่าฝั่งซ้าย กล่องถัดไปจะได้เริ่มตรงขอบบนกล้อง */}
+                {isTabletLandscape && <div style={{ flexShrink: 0 }} />}
                 {lastSentenceBox}
 
                 {/* กล่องสถานะการตรวจจับ — ความสูงคงที่ กล่องด้านล่างเป็น flex:1 จึงหดให้เอง

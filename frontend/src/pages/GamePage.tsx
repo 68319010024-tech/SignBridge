@@ -1066,11 +1066,11 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
 
   // เวลาถอยหลัง — วงแหวนนับถอยหลังตามเวลาที่เหลือ (แดงเมื่อเหลือ ≤ 10 วินาที)
   const timerBox = (
-    <div style={{ ...homeCardStyle, padding: compactColumn ? '10px 14px' : '14px', display: 'flex', flexDirection: isTightColumn ? 'row' : 'column', alignItems: isTightColumn ? 'center' : undefined, justifyContent: isTightColumn && !hideBoxHeaders ? 'space-between' : 'center', gap: compactColumn ? '4px' : '6px', flexShrink: 0 }}>
+    <div style={{ ...homeCardStyle, padding: compactColumn ? '10px 14px' : '14px', flex: hideBoxHeaders ? 1 : undefined, display: 'flex', flexDirection: isTightColumn && !hideBoxHeaders ? 'row' : 'column', alignItems: isTightColumn || hideBoxHeaders ? 'center' : undefined, justifyContent: isTightColumn && !hideBoxHeaders ? 'space-between' : 'center', gap: compactColumn ? '4px' : '6px', flexShrink: 0 }}>
       <Timer style={{ ...homeWatermarkStyle, width: '84px', height: '84px', right: '-14px', top: '-14px' }} />
       {!hideBoxHeaders && <BoxHeader icon={Timer} title="เวลาถอยหลัง" size={compactColumn ? 'sm' : 'md'} />}
       {(() => {
-        const ring = isTightColumn ? 52 : compactColumn ? 60 : 72;
+        const ring = hideBoxHeaders ? 76 : isTightColumn ? 52 : compactColumn ? 60 : 72;
         const radius = ring / 2 - 5;
         const circumference = 2 * Math.PI * radius;
         const ratio = Math.max(0, Math.min(1, timeLeft / difficultyMeta[difficulty].timeLimit));
@@ -1093,7 +1093,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
               />
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: isTightColumn ? '18px' : compactColumn ? '20px' : '24px', fontWeight: 800, color: danger ? '#ef4444' : '#1e293b', lineHeight: 1 }}>{timeLeft}</span>
+              <span style={{ fontSize: hideBoxHeaders ? '24px' : isTightColumn ? '18px' : compactColumn ? '20px' : '24px', fontWeight: 800, color: danger ? '#ef4444' : '#1e293b', lineHeight: 1 }}>{timeLeft}</span>
               <span style={{ fontSize: '9.5px', fontWeight: 600, color: '#64748b', marginTop: '2px' }}>วินาที</span>
             </div>
           </div>
@@ -1104,12 +1104,12 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
 
   // คะแนนสะสม
   const scoreBox = (
-    <div style={{ ...homeCardStyle, flex: 1, minHeight: 'min-content', padding: compactColumn ? '10px 14px' : '14px', display: 'flex', flexDirection: isTightColumn ? 'row' : 'column', alignItems: isTightColumn ? 'center' : undefined, gap: '6px' }}>
+    <div style={{ ...homeCardStyle, flex: 1, minHeight: 'min-content', padding: compactColumn ? '10px 14px' : '14px', display: 'flex', flexDirection: isTightColumn && !hideBoxHeaders ? 'row' : 'column', alignItems: isTightColumn ? 'center' : undefined, justifyContent: 'center', gap: '6px' }}>
       <Award style={{ ...homeWatermarkStyle, width: '96px', height: '96px', right: '-18px', top: '-16px' }} />
       {!hideBoxHeaders && <BoxHeader icon={Award} title="คะแนนสะสม" size={compactColumn ? 'sm' : 'md'} />}
       <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
-          <span key={score} className="sb-score-pop" style={{ fontSize: isTightColumn ? '28px' : compactColumn ? '32px' : '40px', fontWeight: 800, color: '#1e293b' }}>{score}</span>
+          <span key={score} className="sb-score-pop" style={{ fontSize: hideBoxHeaders ? '32px' : isTightColumn ? '28px' : compactColumn ? '32px' : '40px', fontWeight: 800, color: '#1e293b' }}>{score}</span>
           {score > 0 && (
             <span key={`gain-${score}`} className="sb-score-gain" style={{ position: 'absolute', left: '100%', top: '-2px', marginLeft: '2px', fontSize: '17px', fontWeight: 800, color: '#16a34a', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
               +{POINTS_PER_CORRECT}
@@ -1132,6 +1132,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
       isShowSkeleton={isShowSkeleton}
       onToggleSkeleton={() => setIsShowSkeleton(!isShowSkeleton)}
       compact={compactColumn}
+      grow={hideBoxHeaders}
     />
   );
 
@@ -1455,9 +1456,21 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
           <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: hideBoxHeaders ? '8px' : compactColumn ? '12px' : '16px', height: '100%', flexShrink: 0 }}>
             <style>{GAME_BOX_STYLES}</style>
             {startBox}
+            {/* iPad แนวนอนใช้ช่องไฟ 8px แต่ช่องแรกต้อง 16px เท่าฝั่งซ้าย กล่องสถานะจะได้เริ่มตรงขอบบนกล้อง */}
+            {hideBoxHeaders && <div style={{ flexShrink: 0 }} />}
             <DetectionStatusBox status={detectionStatus} height={hideBoxHeaders ? 48 : compactColumn ? 60 : 84} hideHeader={hideBoxHeaders} />
-            {timerBox}
-            {scoreBox}
+            {hideBoxHeaders ? (
+              // iPad แนวนอน: เวลากับคะแนนวางคู่กันแถวเดียว (ไม่มีหัวข้อแล้ว) ให้ที่เหลือกับกล่องควบคุมกล้อง
+              <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                {timerBox}
+                {scoreBox}
+              </div>
+            ) : (
+              <>
+                {timerBox}
+                {scoreBox}
+              </>
+            )}
             {cameraControlBox}
           </div>
 
