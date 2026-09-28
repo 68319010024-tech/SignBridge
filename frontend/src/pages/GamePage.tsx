@@ -1066,26 +1066,28 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
 
   // เวลาถอยหลัง — วงแหวนนับถอยหลังตามเวลาที่เหลือ (แดงเมื่อเหลือ ≤ 10 วินาที)
   const timerBox = (
-    <div style={{ ...homeCardStyle, padding: compactColumn ? '10px 14px' : '14px', flex: hideBoxHeaders ? 1 : undefined, display: 'flex', flexDirection: isTightColumn && !hideBoxHeaders ? 'row' : 'column', alignItems: isTightColumn || hideBoxHeaders ? 'center' : undefined, justifyContent: isTightColumn && !hideBoxHeaders ? 'space-between' : 'center', gap: compactColumn ? '4px' : '6px', flexShrink: 0 }}>
+    <div style={{ ...homeCardStyle, padding: compactColumn ? '10px 14px' : '14px', flex: hideBoxHeaders ? 1 : undefined, display: 'flex', flexDirection: isTightColumn && !hideBoxHeaders ? 'row' : 'column', alignItems: isTightColumn || hideBoxHeaders ? 'center' : undefined, justifyContent: isTabletPortrait ? 'flex-start' : isTightColumn && !hideBoxHeaders ? 'space-between' : 'center', gap: compactColumn ? '4px' : '6px', flexShrink: 0 }}>
       <Timer style={{ ...homeWatermarkStyle, width: '84px', height: '84px', right: '-14px', top: '-14px' }} />
       {!hideBoxHeaders && <BoxHeader icon={Timer} title="เวลาถอยหลัง" size={compactColumn ? 'sm' : 'md'} />}
       {(() => {
-        const ring = hideBoxHeaders ? 76 : isTightColumn ? 52 : compactColumn ? 60 : 72;
-        const radius = ring / 2 - 5;
+        // iPad แนวตั้ง: หัวข้ออยู่บน วงเวลาขยายเต็มที่ว่างที่เหลือของกล่อง (กล่องสูงตามกล่องควบคุมกล้องในแถวเดียวกัน)
+        const ring = isTabletPortrait ? 140 : hideBoxHeaders ? 76 : isTightColumn ? 52 : compactColumn ? 60 : 72;
+        const stroke = isTabletPortrait ? 10 : 6;
+        const radius = ring / 2 - stroke / 2 - 2;
         const circumference = 2 * Math.PI * radius;
         const ratio = Math.max(0, Math.min(1, timeLeft / difficultyMeta[difficulty].timeLimit));
         const danger = timeLeft <= 10;
         return (
-          <div style={{ position: 'relative', alignSelf: 'center', width: `${ring}px`, height: `${ring}px` }}>
+          <div style={{ position: 'relative', alignSelf: 'center', width: `${ring}px`, height: `${ring}px`, margin: isTabletPortrait ? 'auto 0' : undefined }}>
             <svg width={ring} height={ring} style={{ transform: 'rotate(-90deg)' }}>
-              <circle cx={ring / 2} cy={ring / 2} r={radius} fill="none" stroke="#e8f1fd" strokeWidth="6" />
+              <circle cx={ring / 2} cy={ring / 2} r={radius} fill="none" stroke="#e8f1fd" strokeWidth={stroke} />
               <circle
                 cx={ring / 2}
                 cy={ring / 2}
                 r={radius}
                 fill="none"
                 stroke={danger ? '#ef4444' : '#1662c4'}
-                strokeWidth="6"
+                strokeWidth={stroke}
                 strokeLinecap="round"
                 strokeDasharray={circumference}
                 strokeDashoffset={-circumference * (1 - ratio)}
@@ -1093,8 +1095,8 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
               />
             </svg>
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: hideBoxHeaders ? '24px' : isTightColumn ? '18px' : compactColumn ? '20px' : '24px', fontWeight: 800, color: danger ? '#ef4444' : '#1e293b', lineHeight: 1 }}>{timeLeft}</span>
-              <span style={{ fontSize: '9.5px', fontWeight: 600, color: '#64748b', marginTop: '2px' }}>วินาที</span>
+              <span style={{ fontSize: isTabletPortrait ? '40px' : hideBoxHeaders ? '24px' : isTightColumn ? '18px' : compactColumn ? '20px' : '24px', fontWeight: 800, color: danger ? '#ef4444' : '#1e293b', lineHeight: 1 }}>{timeLeft}</span>
+              <span style={{ fontSize: isTabletPortrait ? '13px' : '9.5px', fontWeight: 600, color: '#64748b', marginTop: '2px' }}>วินาที</span>
             </div>
           </div>
         );
