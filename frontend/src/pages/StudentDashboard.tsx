@@ -7,7 +7,7 @@ import {
   Hand,
   Home,
   BookOpen,
-  Gamepad2,
+  ClipboardCheck,
   PlayCircle,
   StopCircle,
   RotateCcw,
@@ -17,16 +17,29 @@ import {
   Menu,
   X,
   CloudFog,
-  Bone
+  Bone,
+  MessageSquareText,
+  ChevronRight,
+  Lightbulb
 } from 'lucide-react';
 
 import DictionaryPage from './DictionaryPage';
 import CategoryDetailPage from './CategoryDetailPage';
 import WordDetailPage from './WordDetailPage';
 import GamePage from './GamePage';
+import SentenceGroupPage from './SentenceGroupPage';
+import SentenceListPage from './SentenceListPage';
+import SentenceDetailPage from './SentenceDetailPage';
+import { SENTENCES, type SentenceLength } from '../data/sentences';
+import { wordsData } from '../data/words';
 import { resolveWsUrl } from '../services/wsConfig';
-import { useIsMobileView } from '../hooks/useIsMobileView';
+import { useIsMobileView, useIsShortView } from '../hooks/useIsMobileView';
 import { MobileControlButton } from '../components/common/MobileControlButton';
+import TooCloseWarning from '../components/webcam/TooCloseWarning';
+import { BoxHeader, homeCardStyle, homeWatermarkStyle, homeButtonStyle, homeButtonIconStyle, homeGhostStyle, homeGhostIconStyle } from '../components/common/BoxHeader';
+import CameraControlBox from '../components/webcam/CameraControlBox';
+import { BLUE_GRADIENT } from '../components/common/theme';
+import DetectionStatusBox, { resolveDetectionStatus } from '../components/webcam/DetectionStatusBox';
 
 const WS_URL = resolveWsUrl();
 const FRAME_SEND_INTERVAL_MS = 100; // ~10 FPS
@@ -37,15 +50,26 @@ interface PredictionMessage {
   type: 'prediction';
   word: string;
   confidence: number;
+  prediction_id: number;
+  too_close?: boolean;
+  is_recording?: boolean;
+  rejected_id?: number;
   tsl_sequence: string[];
   sentence: string;
+  sentence_epoch?: number;
   frame: string | null;
 }
 
+// ตัวเลขใต้ชื่อเมนูในแถบด้านข้าง (นับจากข้อมูลจริง)
+const TOTAL_WORDS = Object.values(wordsData).reduce((n, words) => n + words.length, 0);
+const TOTAL_SENTENCES = SENTENCES[3].length + SENTENCES[4].length;
+
 export const StudentDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'home' | 'dict' | 'game'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'dict' | 'sentence' | 'game'>('home');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
+  const [selectedSentenceLength, setSelectedSentenceLength] = useState<SentenceLength | null>(null);
+  const [selectedSentenceId, setSelectedSentenceId] = useState<string | null>(null);
 
   const [isCameraOn, setIsCameraOn] = useState<boolean>(true);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
@@ -55,13 +79,21 @@ export const StudentDashboard: React.FC = () => {
   const [isMirrored, setIsMirrored] = useState<boolean>(false);
 
   // State ตรวจจับคำเดี่ยว
-  const [singleWordResult, setSingleWordResult] = useState<{ word: string; confidence: number } | null>(null);
+  const [singleWordResult, setSingleWordResult] = useState<{ word: string; confidence: number; id: number } | null>(null);
+  const [isTooClose, setIsTooClose] = useState<boolean>(false);
+  // กล่องสถานะการตรวจจับ: server กำลังเก็บท่าอยู่ไหม + ผลล่าสุดที่โชว์ค้างไว้ชั่วครู่ (สำเร็จ/ไม่ชัดเจน)
+  const [isReadingSign, setIsReadingSign] = useState<boolean>(false);
+  const [statusFlash, setStatusFlash] = useState<{ kind: 'detected'; word: string } | { kind: 'unsure' } | null>(null);
   const [previousWord, setPreviousWord] = useState<string | null>(null);
 
   // State ตรวจจับประโยค
   const [isRecordingSentence, setIsRecordingSentence] = useState<boolean>(false);
   const [recordedWords, setRecordedWords] = useState<string[]>([]);
   const [transformedWords, setTransformedWords] = useState<string[]>([]);
+  // ประโยคที่แปลเสร็จรอบก่อน (กล่อง "ประโยคล่าสุด" ตอนอัดประโยค) — ประโยคปัจจุบันย้ายมาที่นี่เมื่อแสดงครบ 20 วินาที
+  // (server ล้างเอง), มีประโยคใหม่มาแทน หรือกดล้าง/เริ่มอัดใหม่ ส่วน ref เก็บประโยคปัจจุบันไว้ใช้ใน callback ของ WebSocket
+  const [lastSentence, setLastSentence] = useState<string[]>([]);
+  const currentSentenceRef = useRef<string[]>([]);
 
   // State การเชื่อมต่อ WebSocket กับ Python Backend
   const [wsStatus, setWsStatus] = useState<WsStatus>('connecting');
@@ -69,6 +101,10 @@ export const StudentDashboard: React.FC = () => {
   // State ควบคุม Responsive Sidebar: จอเล็ก (มือถือ/แท็บเล็ต) ให้ซ่อน sidebar ไว้เป็นค่าเริ่มต้น
   // แล้วเปิดผ่านปุ่ม hamburger แทน
   const isMobileView = useIsMobileView();
+  // จอสูงไม่เกิน 800px (เช่น 1366x768, 1280x720) ย่อกล่องคอลัมน์ขวาให้ไม่เกินขอบล่างของกล้อง
+  const isShortView = useIsShortView(800);
+  // กล่องประโยคล่าสุดโผล่ตอนอัดประโยค — จอเตี้ยต้องบีบปุ่มในกล่องตรวจจับประโยคให้เหลือแถวเดียว
+  const compactSentenceButtons = isShortView && isRecordingSentence;
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   // State แสดงโครงกระดูก (skeleton overlay) ที่ backend วาดกลับมาให้
@@ -88,6 +124,11 @@ export const StudentDashboard: React.FC = () => {
   const isCameraOnRef = useRef(isCameraOn);
   const isShowSkeletonRef = useRef(isShowSkeleton);
   const lastWordRef = useRef<string | null>(null);
+  const lastPredictionIdRef = useRef<number>(-1);
+  const lastRejectedIdRef = useRef<number>(-1);
+  // รอบการล้างประโยคล่าสุดที่ server แจ้งมา และรอบขั้นต่ำที่ยอมรับข้อมูลประโยค (ดู resetSentence)
+  const lastSentenceEpochRef = useRef<number>(0);
+  const minSentenceEpochRef = useRef<number>(0);
 
   // สั่งงานกล้อง
   const startCamera = async (mode: 'user' | 'environment') => {
@@ -278,17 +319,29 @@ export const StudentDashboard: React.FC = () => {
     ctx.restore();
   };
 
-  const toggleSentenceRecording = () => {
-    if (!isRecordingSentence) {
-      setRecordedWords([]);
-      setTransformedWords([]);
+  // ล้างประโยคทั้งในหน้าเว็บและใน server (คำสะสม/ประโยคที่แปลแล้วอยู่ฝั่ง server และถูกส่งกลับมาทุกเฟรม
+  // ถ้าล้างแค่ state ในหน้าเว็บ คำเก่าจะโผล่กลับมาทันทีในข้อความถัดไป) แล้วรับเฉพาะข้อมูลประโยคจาก
+  // รอบใหม่ (sentence_epoch ที่เพิ่มขึ้นหลัง server ล้างเสร็จ) กันข้อความเก่าที่ยังค้างในท่อมาทับ
+  const resetSentence = () => {
+    if (currentSentenceRef.current.length > 0) setLastSentence(currentSentenceRef.current);
+    currentSentenceRef.current = [];
+    setRecordedWords([]);
+    setTransformedWords([]);
+    minSentenceEpochRef.current = lastSentenceEpochRef.current + 1;
+    const socket = wsRef.current;
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ command: 'reset_sentence' }));
     }
+  };
+
+  const toggleSentenceRecording = () => {
+    // เริ่มอัดประโยคใหม่ต้องเริ่มจากกล่องว่างเสมอ
+    if (!isRecordingSentence) resetSentence();
     setIsRecordingSentence(!isRecordingSentence);
   };
 
   const clearSentence = () => {
-    setRecordedWords([]);
-    setTransformedWords([]);
+    resetSentence();
   };
 
   useEffect(() => {
@@ -333,6 +386,13 @@ export const StudentDashboard: React.FC = () => {
 
       socket.onopen = () => {
         reconnectDelay = 1000;
+        // เชื่อมต่อใหม่ = session ใหม่ฝั่ง server ที่นับ prediction_id จาก 0 ใหม่ ต้องล้างค่าเดิม
+        // ไม่งั้นท่าแรกของ session ใหม่อาจได้ id ตรงกับค่าเก่าพอดีแล้วถูกมองข้ามไป
+        lastPredictionIdRef.current = -1;
+        lastRejectedIdRef.current = -1;
+        // session ใหม่ฝั่ง server เริ่มนับรอบประโยคจาก 0 และคำสะสมว่างอยู่แล้ว
+        lastSentenceEpochRef.current = 0;
+        minSentenceEpochRef.current = 0;
         setWsStatus('connected');
       };
 
@@ -345,18 +405,54 @@ export const StudentDashboard: React.FC = () => {
         }
         if (!data || data.type !== 'prediction') return;
 
-        // อัปเดตกล่องตรวจจับคำเดี่ยว เฉพาะตอนที่คำเปลี่ยนจริง (backend ส่งข้อความทุกเฟรม
-        // แม้คำจะยังไม่เปลี่ยน เพื่อคง state ไว้ให้ตรงกับฝั่ง server)
-        if (data.word && data.confidence > 0 && data.word !== lastWordRef.current) {
-          const previous = lastWordRef.current;
+        // อัปเดตกล่องตรวจจับคำเดี่ยวทุกครั้งที่มีการทำนายใหม่จริง ๆ (prediction_id เปลี่ยน)
+        // backend ส่ง word เดิมซ้ำทุกเฟรม จึงเทียบที่ตัวคำไม่ได้ — ถ้าเทียบที่คำ ผู้ใช้ทำคำเดิมซ้ำ
+        // แล้วหน้าจอจะไม่ขยับเลย ส่วน id ใหม่ทำให้คำเดิมเล่นแอนิเมชันซ้ำให้รู้ว่าระบบรับท่าแล้ว
+        if (
+          data.word &&
+          data.word !== '-' &&
+          typeof data.prediction_id === 'number' &&
+          data.prediction_id !== lastPredictionIdRef.current
+        ) {
+          lastPredictionIdRef.current = data.prediction_id;
+          setPreviousWord(lastWordRef.current);
           lastWordRef.current = data.word;
-          setPreviousWord(previous);
-          setSingleWordResult({ word: data.word, confidence: Math.round(data.confidence * 1000) / 10 });
+          setSingleWordResult({
+            word: data.word,
+            confidence: Math.round(data.confidence * 1000) / 10,
+            id: data.prediction_id
+          });
+          setStatusFlash({ kind: 'detected', word: data.word });
         }
 
+        // จบท่าแล้วแต่ความมั่นใจต่ำ (rejected_id เพิ่ม) → บอกผู้ใช้ให้ลองใหม่ ข้อความแรกหลังเชื่อมต่อใช้เป็นค่าตั้งต้นเฉย ๆ
+        if (typeof data.rejected_id === 'number') {
+          if (lastRejectedIdRef.current !== -1 && data.rejected_id !== lastRejectedIdRef.current) {
+            setStatusFlash({ kind: 'unsure' });
+          }
+          lastRejectedIdRef.current = data.rejected_id;
+        }
+        setIsReadingSign(data.is_recording === true);
+
+        setIsTooClose(data.too_close === true);
+
         // กล่องตรวจจับประโยค: ผูกตรงกับ word buffer / ประโยคที่ backend จัดเรียงให้แล้ว
-        setRecordedWords(Array.isArray(data.tsl_sequence) ? data.tsl_sequence : []);
-        setTransformedWords(data.sentence ? data.sentence.split(' ').filter(Boolean) : []);
+        const epoch = typeof data.sentence_epoch === 'number' ? data.sentence_epoch : 0;
+        lastSentenceEpochRef.current = epoch;
+        if (epoch >= minSentenceEpochRef.current) {
+          setRecordedWords(Array.isArray(data.tsl_sequence) ? data.tsl_sequence : []);
+          const sentenceWords = data.sentence ? data.sentence.split(' ').filter(Boolean) : [];
+          const prevSentence = currentSentenceRef.current;
+          if (sentenceWords.length > 0 && sentenceWords.join(' ') !== prevSentence.join(' ')) {
+            if (prevSentence.length > 0) setLastSentence(prevSentence);
+            currentSentenceRef.current = sentenceWords;
+          } else if (sentenceWords.length === 0 && prevSentence.length > 0) {
+            // server ล้างประโยคที่แสดงครบ 20 วินาทีแล้ว → ย้ายไปกล่องประโยคล่าสุด
+            setLastSentence(prevSentence);
+            currentSentenceRef.current = [];
+          }
+          setTransformedWords(sentenceWords);
+        }
 
         // ภาพ skeleton overlay ที่ backend วาดกลับมาให้ (เมื่อเปิดใช้งาน)
         if (isShowSkeletonRef.current && data.frame) {
@@ -379,6 +475,8 @@ export const StudentDashboard: React.FC = () => {
         }
         if (isUnmounted) return;
         setWsStatus('disconnected');
+        setIsTooClose(false);
+        setIsReadingSign(false);
         reconnectTimeoutRef.current = setTimeout(connect, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
       };
@@ -447,6 +545,20 @@ export const StudentDashboard: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!statusFlash) return;
+    const t = setTimeout(() => setStatusFlash(null), 2500);
+    return () => clearTimeout(t);
+  }, [statusFlash]);
+
+  const detectionStatus = resolveDetectionStatus({
+    isCameraOn,
+    isConnected: wsStatus === 'connected',
+    isTooClose,
+    isReadingSign,
+    flash: statusFlash
+  });
+
   // กล่องแสดงภาพกล้อง (ใช้ร่วมกันทั้ง layout desktop และ mobile — มี video/canvas ref
   // ตัวเดียวกัน เปลี่ยนแค่ขนาด/ตำแหน่งของ container ที่ห่อมันตามแต่ละ layout)
   const cameraBox = (
@@ -470,7 +582,7 @@ export const StudentDashboard: React.FC = () => {
       {isCameraOn && (
         <div style={{ position: 'absolute', top: '16px', left: '16px', display: 'flex', alignItems: 'center', gap: '7px', backgroundColor: 'rgba(0,0,0,0.55)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '9999px', padding: '6px 14px', zIndex: 3, backdropFilter: 'blur(4px)' }}>
           <span className="sb-live-dot" style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444', boxShadow: '0 0 6px #ef4444' }} />
-          <span style={{ fontSize: '12px', fontWeight: '800', color: '#ffffff', letterSpacing: '0.5px' }}>LIVE</span>
+          <span style={{ fontSize: '12px', fontWeight: '800', color: '#ffffff', letterSpacing: '0.5px' }}>กำลังเปิดกล้อง</span>
         </div>
       )}
 
@@ -494,6 +606,8 @@ export const StudentDashboard: React.FC = () => {
           display: isCameraOn ? 'block' : 'none'
         }}
       />
+
+      <TooCloseWarning show={isCameraOn && wsStatus === 'connected' && isTooClose} />
 
       {isCameraOn && isShowSkeleton && skeletonFrame && (
         <img
@@ -539,7 +653,21 @@ export const StudentDashboard: React.FC = () => {
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap');
 
         .sb-nav-item { transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease; }
-        .sb-nav-item-inactive:hover { background-color: #eaf2fd !important; color: #0d47a1 !important; transform: translateX(2px); }
+        .sb-topbar { background: linear-gradient(120deg, #0d47a1 0%, #123a80 28%, #1a5aa8 55%, #4fa3e0 82%, #6fbeef 100%); }
+        .sb-topbar > * { position: relative; }
+        .sb-topbar > .sb-topbar-orb, .sb-topbar > .sb-topbar-shine { position: absolute; }
+        .sb-topbar-orb { border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.18), rgba(255,255,255,0) 70%); pointer-events: none; animation: sb-topbar-orb 10s ease-in-out infinite; }
+        @keyframes sb-topbar-orb { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(40px, 18px); } }
+        .sb-topbar-shine { top: 0; bottom: 0; width: 180px; left: -200px; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.16), transparent); pointer-events: none; animation: sb-topbar-shine 7s ease-in-out infinite; }
+        @keyframes sb-topbar-shine { 0% { left: -200px; } 45%, 100% { left: 110%; } }
+        .sb-topbar-ring { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, #ffffff, #6fbeef, #bfe1f9, #ffffff); animation: sb-topbar-spin 6s linear infinite; opacity: 0.9; }
+        @keyframes sb-topbar-spin { to { transform: rotate(360deg); } }
+        .sb-topbar-wave { transform-origin: 70% 80%; animation: sb-topbar-wave 5s ease-in-out infinite; }
+        @keyframes sb-topbar-wave { 0%, 76%, 100% { transform: rotate(0deg); } 80% { transform: rotate(16deg); } 84% { transform: rotate(-10deg); } 88% { transform: rotate(14deg); } 92% { transform: rotate(-6deg); } }
+        @media (prefers-reduced-motion: reduce) { .sb-topbar-orb, .sb-topbar-shine, .sb-topbar-ring, .sb-topbar-wave { animation: none !important; } }
+        .sb-nav-item { outline: none; }
+        .sb-nav-item:focus-visible { box-shadow: 0 0 0 3px rgba(22,98,196,0.35) !important; }
+        .sb-nav-item-inactive:hover { background-color: #ffffff !important; border-color: #e3ecf7 !important; box-shadow: 0 8px 18px -12px rgba(13,71,161,0.35) !important; transform: translateX(3px); }
         .sb-nav-item-inactive:hover .sb-nav-icon-badge { background-color: #dbeafe !important; }
 
         .sb-primary-btn { transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease; }
@@ -559,10 +687,17 @@ export const StudentDashboard: React.FC = () => {
 
         @keyframes sb-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         .sb-fade-in { animation: sb-fade-in 0.45s ease-out; }
+
+        @keyframes sb-word-pop { 0% { transform: scale(0.85); opacity: 0.4; } 60% { transform: scale(1.12); } 100% { transform: scale(1); opacity: 1; } }
+        .sb-word-pop { display: inline-block; animation: sb-word-pop 0.4s ease-out; }
       `}</style>
 
       {/* TOPBAR */}
-      <header style={{ background: 'linear-gradient(120deg, #0d47a1 0%, #123a80 28%, #1a5aa8 55%, #4fa3e0 82%, #6fbeef 100%)', height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0, boxShadow: '0 4px 16px -4px rgba(13,71,161,0.4)', position: 'relative', zIndex: 2 }}>
+      <header className="sb-topbar" style={{ height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0, boxShadow: '0 4px 16px -4px rgba(13,71,161,0.4)', position: 'relative', zIndex: 2, overflow: 'hidden' }}>
+        <span className="sb-topbar-orb" style={{ width: '220px', height: '220px', left: '32%', top: '-150px' }} />
+        <span className="sb-topbar-orb" style={{ width: '160px', height: '160px', right: '14%', top: '-40px', animationDelay: '-4s' }} />
+        <span className="sb-topbar-shine" />
+        <span style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.45) 30%, rgba(255,255,255,0.45) 70%, transparent)', pointerEvents: 'none' }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0, flex: 1, overflow: 'hidden' }}>
           {isMobileView && (
             <button
@@ -588,8 +723,11 @@ export const StudentDashboard: React.FC = () => {
               )}
             </button>
           )}
-          <div style={{ width: '46px', height: '46px', flexShrink: 0, backgroundColor: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #bfe1f9', boxShadow: '0 0 0 3px rgba(255,255,255,0.15), 0 3px 10px rgba(0,0,0,0.15)' }}>
-            <Hand style={{ width: '22px', height: '22px', color: '#0d47a1' }} />
+          <div style={{ position: 'relative', width: '50px', height: '50px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span className="sb-topbar-ring" />
+            <div style={{ position: 'relative', width: '44px', height: '44px', backgroundColor: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 3px 10px rgba(0,0,0,0.18)' }}>
+              <Hand className="sb-topbar-wave" style={{ width: '22px', height: '22px', color: '#0d47a1' }} />
+            </div>
           </div>
           <div style={{ minWidth: 0, overflow: 'hidden' }}>
             <h1 style={{ fontSize: '20px', fontWeight: '800', color: '#ffffff', margin: 0, letterSpacing: '0.2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -602,7 +740,7 @@ export const StudentDashboard: React.FC = () => {
         </div>
 
         {/* บนจอมือถือ/แท็บเล็ตย่อเหลือแค่จุดสี ไม่ใส่ข้อความ เพราะพื้นที่แคบจนไปทับชื่อแอพ */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.28)', borderRadius: '9999px', padding: isMobileView ? '8px' : '6px 14px', backdropFilter: 'blur(6px)', flexShrink: 0 }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: 'rgba(255,255,255,0.14)', border: '1px solid rgba(255,255,255,0.28)', borderRadius: '9999px', padding: isMobileView ? '8px' : '6px 14px', backdropFilter: 'blur(6px)', flexShrink: 0 }}>
           <span
             style={{
               width: '9px',
@@ -658,21 +796,19 @@ export const StudentDashboard: React.FC = () => {
             zIndex: 40
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#0d47a1', marginBottom: '14px', padding: '0 6px' }}>
-            <div style={{ width: '28px', height: '28px', borderRadius: '8px', backgroundColor: '#e8f1fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Grid style={{ width: '15px', height: '15px', color: '#0d47a1' }} />
-            </div>
-            <span style={{ fontSize: '14px', fontWeight: '800', letterSpacing: '0.2px' }}>ภาพรวม</span>
+          <div style={{ padding: '2px 6px', marginBottom: '14px' }}>
+            <BoxHeader icon={Grid} title="ภาพรวม" />
           </div>
 
           <div style={{ height: '1px', background: 'linear-gradient(90deg, transparent, #dce8f7 15%, #dce8f7 85%, transparent)', margin: '0 2px 14px 2px' }} />
 
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {([
-              { key: 'home' as const, label: 'หน้าหลัก', Icon: Home },
-              { key: 'dict' as const, label: 'คลังศัพท์', Icon: BookOpen },
-              { key: 'game' as const, label: 'เกมส์', Icon: Gamepad2 },
-            ]).map(({ key, label, Icon }) => {
+              { key: 'home' as const, label: 'หน้าหลัก', sub: 'แปลภาษามือสด', Icon: Home },
+              { key: 'dict' as const, label: 'คลังศัพท์', sub: `${TOTAL_WORDS} คำ · ${Object.keys(wordsData).length} หมวด`, Icon: BookOpen },
+              { key: 'sentence' as const, label: 'ตัวอย่างประโยค', sub: `${TOTAL_SENTENCES} ประโยค`, Icon: MessageSquareText },
+              { key: 'game' as const, label: 'โหมดฝึกฝน', sub: '3 ระดับ · จับเวลา', Icon: ClipboardCheck },
+            ]).map(({ key, label, sub, Icon }) => {
               const isActive = activeTab === key;
               return (
                 <button
@@ -681,42 +817,50 @@ export const StudentDashboard: React.FC = () => {
                     setActiveTab(key);
                     setSelectedCategory(null);
                     setSelectedWord(null);
+                    setSelectedSentenceLength(null);
+                    setSelectedSentenceId(null);
                     if (isMobileView) setIsSidebarOpen(false);
                   }}
                   className={`sb-nav-item ${isActive ? 'sb-nav-item-active' : 'sb-nav-item-inactive'}`}
                   style={{
+                    position: 'relative',
+                    overflow: 'hidden',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '10px',
-                    padding: '9px 12px',
-                    borderRadius: '12px',
-                    fontSize: '14px',
-                    fontWeight: '700',
-                    border: 'none',
+                    padding: '8px 10px 8px 8px',
+                    borderRadius: '16px',
+                    border: '1px solid transparent',
                     cursor: 'pointer',
                     textAlign: 'left',
-                    background: isActive ? 'linear-gradient(135deg, #0d47a1 0%, #1662c4 100%)' : 'transparent',
-                    color: isActive ? '#ffffff' : '#64748b',
-                    boxShadow: isActive ? '0 4px 12px -3px rgba(13,71,161,0.4)' : 'none'
+                    fontFamily: 'inherit',
+                    background: isActive ? BLUE_GRADIENT : 'transparent',
+                    boxShadow: isActive ? '0 10px 20px -10px rgba(22,98,196,0.75)' : 'none'
                   }}
                 >
                   <span
                     className="sb-nav-icon-badge"
                     style={{
-                      width: '26px',
-                      height: '26px',
-                      borderRadius: '8px',
+                      position: 'relative',
+                      width: '34px',
+                      height: '34px',
+                      borderRadius: '11px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       flexShrink: 0,
                       backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : '#eef4fc',
+                      border: isActive ? '1px solid rgba(255,255,255,0.35)' : '1px solid #e3ecf7',
                       transition: 'background-color 0.2s ease'
                     }}
                   >
-                    <Icon style={{ width: '14px', height: '14px', color: isActive ? '#ffffff' : '#0d47a1' }} />
+                    <Icon style={{ width: '17px', height: '17px', color: isActive ? '#ffffff' : '#0d47a1' }} />
                   </span>
-                  {label}
+                  <span style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', lineHeight: 1.25 }}>
+                    <span style={{ fontSize: '14px', fontWeight: 800, color: isActive ? '#ffffff' : '#334155', whiteSpace: 'nowrap' }}>{label}</span>
+                    <span style={{ fontSize: '11px', fontWeight: 600, color: isActive ? 'rgba(255,255,255,0.8)' : '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</span>
+                  </span>
+                  {isActive && <ChevronRight style={{ position: 'relative', width: '16px', height: '16px', color: '#ffffff', flexShrink: 0 }} />}
                 </button>
               );
             })}
@@ -724,9 +868,18 @@ export const StudentDashboard: React.FC = () => {
 
           <div style={{ flex: 1 }} />
 
+          {/* เคล็ดลับการวางตัวหน้ากล้อง — สาเหตุหลักที่ AI ทายผิดคือนั่งใกล้กล้องเกินไป */}
+          <div style={{ ...homeCardStyle, borderRadius: '18px', padding: '12px', marginBottom: '12px', background: 'linear-gradient(160deg, #ffffff 0%, #eef5ff 100%)' }}>
+            <Lightbulb style={{ ...homeWatermarkStyle, width: '64px', height: '64px', right: '-12px', top: '-10px', opacity: 0.07 }} />
+            <BoxHeader icon={Lightbulb} title="เคล็ดลับ" size="sm" />
+            <p style={{ position: 'relative', margin: '8px 0 0 0', fontSize: '11.5px', fontWeight: 600, color: '#475569', lineHeight: 1.5 }}>
+              ให้เห็นศีรษะถึงช่วงอก และทำมือที่ระดับอก AI จะอ่านท่าได้แม่นยำขึ้น
+            </p>
+          </div>
+
           <div style={{ padding: '10px 6px 2px 6px', borderTop: '1px solid #e7effa', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <div style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#6fbeef' }} />
-            <span style={{ fontSize: '11px', fontWeight: '600', color: '#94a3b8' }}>SignBridge · IT-HTC</span>
+            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: BLUE_GRADIENT }} />
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8' }}>SignBridge · IT-HTC</span>
           </div>
         </aside>
 
@@ -758,7 +911,7 @@ export const StudentDashboard: React.FC = () => {
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '3px' }}>
                       {isCameraOn && singleWordResult ? (
                         <>
-                          <span style={{ fontSize: '22px', fontWeight: '800', color: '#0d47a1' }}>{singleWordResult.word}</span>
+                          <span key={singleWordResult.id} className="sb-word-pop" style={{ fontSize: '22px', fontWeight: '800', color: '#0d47a1' }}>{singleWordResult.word}</span>
                           <span style={{ fontSize: '12.5px', fontWeight: 'bold', color: '#16a34a' }}>({singleWordResult.confidence}%)</span>
                         </>
                       ) : (
@@ -843,88 +996,62 @@ export const StudentDashboard: React.FC = () => {
               {/* ฝั่งซ้าย */}
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
 
-                {/* กล่องซ้ายบน */}
-                <div style={{ height: '116px', backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '24px', display: 'flex', alignItems: 'stretch', overflow: 'hidden', boxShadow: '0 8px 22px -12px rgba(13,71,161,0.14)', flexShrink: 0 }}>
-                  
+                {/* กล่องซ้ายบน: ผลคำเดี่ยว / ผลประโยค (ตอนอัดประโยค) */}
+                <div style={{ ...homeCardStyle, height: '116px', display: 'flex', alignItems: 'stretch', flexShrink: 0 }}>
+                  <Hand style={{ ...homeWatermarkStyle, width: '130px', height: '130px', right: '-20px', top: '-18px' }} />
+
                   {!isRecordingSentence ? (
-                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', gap: '16px', background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)' }}>
-                      <div style={{ width: '48px', height: '48px', borderRadius: '16px', backgroundColor: '#e8f1fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Aperture style={{ width: '26px', height: '26px', color: '#0d47a1' }} />
+                    <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', gap: '18px' }}>
+                      <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: BLUE_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 20px -10px rgba(22,98,196,0.7)', flexShrink: 0 }}>
+                        <Aperture style={{ width: '28px', height: '28px', color: '#ffffff' }} />
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#64748b' }}>ผลการตรวจจับคำเดี่ยว (Single Word)</span>
-                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                          {isCameraOn && singleWordResult ? (
-                            <>
-                              <span style={{ fontSize: '28px', fontWeight: '800', color: '#0d47a1' }}>
-                                {singleWordResult.word}
-                              </span>
-                              <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#16a34a' }}>
-                                ({singleWordResult.confidence}%)
-                              </span>
-                            </>
-                          ) : (
-                            <span style={{ color: '#94a3b8', letterSpacing: '4px', fontSize: '18px', fontFamily: 'monospace' }}>
-                              ------------------
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                        <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#64748b' }}>ผลการตรวจจับคำเดี่ยว (Single Word)</span>
+                        {isCameraOn && singleWordResult ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                            <span key={singleWordResult.id} className="sb-word-pop" style={{ fontSize: '30px', fontWeight: 800, color: '#0d47a1', lineHeight: 1.2 }}>
+                              {singleWordResult.word}
                             </span>
-                          )}
-                        </div>
+                            {/* แถบความมั่นใจ */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '120px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 800, color: '#16a34a' }}>ความมั่นใจ {singleWordResult.confidence}%</span>
+                              <div style={{ height: '6px', borderRadius: '9999px', backgroundColor: '#e2e8f0', overflow: 'hidden' }}>
+                                <div style={{ width: `${singleWordResult.confidence}%`, height: '100%', borderRadius: '9999px', background: 'linear-gradient(90deg, #22c55e, #16a34a)', transition: 'width 0.4s ease' }} />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: '15px', fontWeight: 700, color: '#94a3b8', lineHeight: '36px' }}>ทำท่าภาษามือหน้ากล้องเพื่อเริ่มตรวจจับ</span>
+                        )}
                       </div>
                     </div>
                   ) : (
                     <>
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '8px' }}>
-                          <div style={{ width: '24px', height: '24px', borderRadius: '7px', backgroundColor: '#e8f1fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Flag style={{ width: '13px', height: '13px', color: '#0d47a1' }} />
+                      {[
+                        { icon: Flag, title: 'ไวยากรณ์ภาษาไทย', words: transformedWords },
+                        { icon: Hand, title: 'ไวยากรณ์ภาษามือไทย', words: recordedWords },
+                      ].map((col, colIndex) => (
+                        <React.Fragment key={col.title}>
+                          {colIndex > 0 && <div style={{ width: '1px', background: 'linear-gradient(180deg, transparent, #dce8f7 20%, #dce8f7 80%, transparent)', flexShrink: 0 }} />}
+                          <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '14px 18px', minWidth: 0 }}>
+                            <BoxHeader icon={col.icon} title={col.title} />
+                            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                              {col.words.length > 0 ? (
+                                col.words.map((word, idx) => (
+                                  <React.Fragment key={idx}>
+                                    {idx > 0 && <ChevronRight style={{ width: '14px', height: '14px', color: '#94a3b8' }} />}
+                                    <span style={{ fontSize: '16px', fontWeight: 800, color: '#0d47a1', backgroundColor: '#eef4fc', padding: '3px 12px', borderRadius: '10px' }}>{word}</span>
+                                  </React.Fragment>
+                                ))
+                              ) : (
+                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#94a3b8' }}>ยังไม่มีคำ</span>
+                              )}
+                            </div>
                           </div>
-                          <span style={{ fontSize: '15px', fontWeight: '800', color: '#1e293b' }}>ไวยากรณ์ภาษาไทย</span>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {transformedWords.length > 0 ? (
-                            transformedWords.map((word, idx) => (
-                              <React.Fragment key={idx}>
-                                <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#0d47a1' }}>{word}</span>
-                                {idx < transformedWords.length - 1 && <span style={{ color: '#94a3b8' }}>-</span>}
-                              </React.Fragment>
-                            ))
-                          ) : (
-                            <span style={{ color: '#94a3b8', letterSpacing: '4px', fontSize: '18px', fontFamily: 'monospace' }}>
-                              ------------------
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div style={{ width: '1px', background: 'linear-gradient(180deg, transparent, #dce8f7 20%, #dce8f7 80%, transparent)', flexShrink: 0 }} />
-
-                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '8px' }}>
-                          <div style={{ width: '24px', height: '24px', borderRadius: '7px', backgroundColor: '#e8f1fd', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Hand style={{ width: '13px', height: '13px', color: '#0d47a1' }} />
-                          </div>
-                          <span style={{ fontSize: '15px', fontWeight: '800', color: '#1e293b' }}>ไวยากรณ์มือภาษาไทย</span>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          {recordedWords.length > 0 ? (
-                            recordedWords.map((word, idx) => (
-                              <React.Fragment key={idx}>
-                                <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#0d47a1' }}>{word}</span>
-                                {idx < recordedWords.length - 1 && <span style={{ color: '#94a3b8' }}>-</span>}
-                              </React.Fragment>
-                            ))
-                          ) : (
-                            <span style={{ color: '#94a3b8', letterSpacing: '4px', fontSize: '18px', fontFamily: 'monospace' }}>
-                              ------------------
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                        </React.Fragment>
+                      ))}
                     </>
                   )}
-
                 </div>
 
                 {/* Display หน้าจอกล้อง Canvas */}
@@ -933,68 +1060,85 @@ export const StudentDashboard: React.FC = () => {
               </div>
 
               {/* ฝั่งขวา */}
-              <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: '16px', flexShrink: 0 }}>
+              <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: isShortView ? '12px' : '16px', flexShrink: 0 }}>
                 
-                {/* 1. กล่องบนสุดฝั่งขวา */}
-                <div style={{ height: '116px', backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '24px', padding: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', boxShadow: '0 8px 22px -12px rgba(13,71,161,0.14)', flexShrink: 0, boxSizing: 'border-box' }}>
+                {/* 1. กล่องบนสุดฝั่งขวา: คำล่าสุด / คำที่สะสมตอนอัดประโยค */}
+                <div style={{ ...homeCardStyle, height: '116px', padding: '14px', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '6px', textAlign: 'center', flexShrink: 0 }}>
                   {!isRecordingSentence ? (
                     <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                        <History style={{ width: '14px', height: '14px', color: '#0d47a1' }} />
-                        <span style={{ fontSize: '13px', fontWeight: '800', color: '#1e293b' }}>คำล่าสุด</span>
-                      </div>
-                      <span style={{ fontSize: '20px', fontWeight: '800', color: isCameraOn && previousWord ? '#0d47a1' : '#cbd5e1' }}>
+                      <History style={{ ...homeWatermarkStyle, width: '84px', height: '84px', right: '-14px', top: '-14px' }} />
+                      <BoxHeader icon={History} title="คำล่าสุด" />
+                      <span style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px', fontWeight: 800, color: isCameraOn && previousWord ? '#0d47a1' : '#cbd5e1', lineHeight: 1.2 }}>
                         {isCameraOn && previousWord ? previousWord : '-'}
                       </span>
                     </>
                   ) : (
                     <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
-                        <Sparkles style={{ width: '14px', height: '14px', color: '#0d47a1' }} />
-                        <span style={{ fontSize: '13px', fontWeight: '800', color: '#1e293b' }}>คำที่ตรวจจับได้</span>
-                      </div>
-                      <span style={{ fontSize: '14px', fontWeight: '800', color: recordedWords.length > 0 ? '#0d47a1' : '#94a3b8' }}>
-                        {recordedWords.length > 0 ? recordedWords.join(' -> ') : 'ยังไม่มีคำสะสม'}
+                      <Sparkles style={{ ...homeWatermarkStyle, width: '84px', height: '84px', right: '-14px', top: '-14px' }} />
+                      <BoxHeader icon={Sparkles} title="คำที่ตรวจจับได้" />
+                      <span style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: 800, color: recordedWords.length > 0 ? '#0d47a1' : '#94a3b8' }}>
+                        {recordedWords.length > 0 ? recordedWords.join(' › ') : 'ยังไม่มีคำสะสม'}
                       </span>
                     </>
                   )}
                 </div>
 
-                {/* 2. กล่องตรงกลางฝั่งขวา */}
-                <div style={{ flex: 1, backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '24px', padding: '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '12px', boxShadow: '0 8px 20px -12px rgba(13,71,161,0.16)' }}>
-                  <span style={{ fontSize: '12px', fontWeight: '800', color: '#94a3b8', letterSpacing: '0.4px', padding: '0 2px' }}>ตรวจจับประโยค</span>
+                {/* กล่องประโยคล่าสุด (เฉพาะโหมดอัดประโยค) — ความสูงคงที่แบบกล่องสถานะ กล่องตรวจจับประโยค/ควบคุมกล้อง
+                    ด้านล่างเป็น flex:1 จึงหดให้เอง คอลัมน์ขวาจึงยังจบตรงขอบล่างกล้อง */}
+                {isRecordingSentence && (
+                  <div style={{ ...homeCardStyle, height: isShortView ? '60px' : '84px', padding: isShortView ? '4px 12px' : '10px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: isShortView ? '3px' : '6px', flexShrink: 0 }}>
+                    <MessageSquareText style={{ ...homeWatermarkStyle, width: '70px', height: '70px', right: '-12px', top: '-12px' }} />
+                    <BoxHeader icon={History} title="ประโยคล่าสุด" size={isShortView ? 'sm' : 'md'} />
+                    <span
+                      key={lastSentence.join(' ')}
+                      className="sb-word-pop"
+                      title={lastSentence.join(' ')}
+                      style={{ position: 'relative', alignSelf: 'center', maxWidth: '100%', fontSize: isShortView ? '13px' : '14px', fontWeight: 800, color: lastSentence.length > 0 ? '#0d47a1' : '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                    >
+                      {lastSentence.length > 0 ? lastSentence.join(' ') : 'ยังไม่มีประโยค'}
+                    </span>
+                  </div>
+                )}
 
+                {/* 2. กล่องสถานะการตรวจจับ — ความสูงคงที่ กล่อง 3-4 ด้านล่างเป็น flex:1 จึงหดให้เอง
+                    ขอบล่างของคอลัมน์ขวายังตรงกับขอบล่างกล้องพอดี */}
+                <DetectionStatusBox status={detectionStatus} height={isShortView ? 60 : 84} />
+
+                {/* 3. กล่องตรวจจับประโยค */}
+                <div style={{ ...homeCardStyle, flex: 1, minHeight: 'min-content', padding: isShortView ? '12px 14px' : '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: isShortView ? '8px' : '12px' }}>
+                  <MessageSquareText style={{ ...homeWatermarkStyle, width: '96px', height: '96px', right: '-18px', top: '-16px' }} />
+                  <BoxHeader icon={MessageSquareText} title="ตรวจจับประโยค" size={isShortView ? 'sm' : 'md'} />
+
+                  {/* จอเตี้ยตอนอัดประโยค (มีกล่องประโยคล่าสุดเพิ่มมา): วางสองปุ่มเรียงแถวเดียวให้คอลัมน์ไม่เกินขอบกล้อง */}
+                  <div style={{ display: 'flex', flexDirection: compactSentenceButtons ? 'row' : 'column', gap: compactSentenceButtons ? '6px' : (isShortView ? '8px' : '12px') }}>
                   <button
                     onClick={toggleSentenceRecording}
                     disabled={!isCameraOn}
                     className="sb-primary-btn"
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      width: '100%',
-                      padding: '10px 12px',
-                      borderRadius: '9999px',
-                      fontWeight: 'bold',
-                      fontSize: '13.5px',
-                      border: 'none',
+                      ...homeButtonStyle,
+                      padding: compactSentenceButtons ? '7px 8px' : '10px 12px',
+                      fontSize: compactSentenceButtons ? '12.5px' : '13.5px',
+                      gap: compactSentenceButtons ? '5px' : '8px',
+                      flex: compactSentenceButtons ? 1 : undefined,
+                      minWidth: 0,
                       cursor: isCameraOn ? 'pointer' : 'not-allowed',
-                      background: isRecordingSentence 
-                        ? 'linear-gradient(135deg, #dc2626, #b91c1c)' 
-                        : 'linear-gradient(135deg, #16a34a, #15803d)',
+                      background: isRecordingSentence
+                        ? 'linear-gradient(135deg, #b91c1c, #ef4444)'
+                        : 'linear-gradient(135deg, #15803d, #22c55e)',
                       color: '#ffffff',
-                      boxShadow: '0 3px 10px rgba(0,0,0,0.1)',
+                      boxShadow: isRecordingSentence ? '0 8px 18px -8px rgba(220,38,38,0.6)' : '0 8px 18px -8px rgba(22,163,74,0.6)',
                       opacity: isCameraOn ? 1 : 0.4
                     }}
                   >
-                    <div style={{ width: '24px', height: '24px', backgroundColor: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ ...homeButtonIconStyle, backgroundColor: 'rgba(255,255,255,0.22)' }}>
                       {isRecordingSentence ? (
-                        <StopCircle style={{ width: '15px', height: '15px', color: '#dc2626' }} />
+                        <StopCircle style={{ width: '15px', height: '15px', color: '#ffffff' }} />
                       ) : (
-                        <PlayCircle style={{ width: '15px', height: '15px', color: '#16a34a' }} />
+                        <PlayCircle style={{ width: '15px', height: '15px', color: '#ffffff' }} />
                       )}
-                    </div>
-                    {isRecordingSentence ? 'แปลผลประโยค' : 'เริ่มอัดประโยค'}
+                    </span>
+                    {isRecordingSentence ? (compactSentenceButtons ? 'แปลผล' : 'แปลผลประโยค') : 'เริ่มอัดประโยค'}
                   </button>
 
                   <button
@@ -1002,149 +1146,36 @@ export const StudentDashboard: React.FC = () => {
                     disabled={!isCameraOn}
                     className="sb-ghost-btn"
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '9999px',
-                      fontWeight: 'bold',
-                      fontSize: '13px',
-                      border: 'none',
+                      ...homeButtonStyle,
+                      ...homeGhostStyle,
+                      padding: compactSentenceButtons ? '6px 8px' : homeGhostStyle.padding,
+                      fontSize: compactSentenceButtons ? '12.5px' : '13px',
+                      gap: compactSentenceButtons ? '5px' : '8px',
+                      flex: compactSentenceButtons ? 1 : undefined,
+                      minWidth: 0,
                       cursor: isCameraOn ? 'pointer' : 'not-allowed',
-                      backgroundColor: '#f1f5f9',
-                      color: '#475569',
                       opacity: isCameraOn ? 1 : 0.4
                     }}
                   >
-                    <div style={{ width: '22px', height: '22px', border: '1px solid #cbd5e1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <RotateCcw style={{ width: '13px', height: '13px', color: '#64748b' }} />
-                    </div>
-                    ล้างประโยค
+                    <span style={homeGhostIconStyle}>
+                      <RotateCcw style={{ width: '13px', height: '13px', color: '#0d47a1' }} />
+                    </span>
+                    {compactSentenceButtons ? 'ล้าง' : 'ล้างประโยค'}
                   </button>
-                </div>
-
-                {/* 3. กล่องล่างสุดฝั่งขวา */}
-                <div style={{ flex: 1, backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '24px', padding: '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '10px', boxShadow: '0 8px 20px -12px rgba(13,71,161,0.16)' }}>
-                  <span style={{ fontSize: '12px', fontWeight: '800', color: '#94a3b8', letterSpacing: '0.4px', padding: '0 2px' }}>ควบคุมกล้อง</span>
-
-                  <button
-                    onClick={toggleCamera}
-                    className="sb-primary-btn"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      width: '100%',
-                      padding: '9px 12px',
-                      borderRadius: '9999px',
-                      fontWeight: 'bold',
-                      fontSize: '13px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      background: isCameraOn ? 'linear-gradient(135deg, #0d47a1, #1662c4)' : 'linear-gradient(135deg, #ef4444, #dc2626)',
-                      color: '#ffffff',
-                      boxShadow: '0 3px 10px rgba(0,0,0,0.1)'
-                    }}
-                  >
-                    <div style={{ width: '22px', height: '22px', backgroundColor: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Camera style={{ width: '13px', height: '13px', color: isCameraOn ? '#0d47a1' : '#ef4444' }} />
-                    </div>
-                    {isCameraOn ? 'เปิดกล้อง' : 'ปิดกล้อง'}
-                  </button>
-
-                  <button
-                    onClick={switchCamera}
-                    disabled={!isCameraOn}
-                    className="sb-ghost-btn"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '9999px',
-                      fontWeight: 'bold',
-                      fontSize: '12.5px',
-                      border: 'none',
-                      cursor: isCameraOn ? 'pointer' : 'not-allowed',
-                      backgroundColor: '#f1f5f9',
-                      color: '#334155',
-                      opacity: isCameraOn ? 1 : 0.4
-                    }}
-                  >
-                    <div style={{ width: '20px', height: '20px', border: '1px solid #cbd5e1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <RefreshCw style={{ width: '12px', height: '12px', color: '#64748b' }} />
-                    </div>
-                    สลับกล้อง
-                  </button>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f1f5f9', color: '#334155', padding: '6px 10px', borderRadius: '9999px', fontWeight: 'bold', fontSize: '11.5px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <button
-                        onClick={() => setIsBlurBg(!isBlurBg)}
-                        disabled={!isCameraOn}
-                        style={{
-                          width: '32px',
-                          height: '16px',
-                          borderRadius: '9999px',
-                          border: 'none',
-                          padding: '2px',
-                          cursor: isCameraOn ? 'pointer' : 'not-allowed',
-                          backgroundColor: isBlurBg ? '#0d47a1' : '#cbd5e1',
-                          opacity: isCameraOn ? 1 : 0.4,
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: '12px',
-                            height: '12px',
-                            borderRadius: '50%',
-                            backgroundColor: '#ffffff',
-                            transform: isBlurBg ? 'translateX(16px)' : 'translateX(0px)',
-                            transition: 'transform 0.3s'
-                          }}
-                        />
-                      </button>
-                      <span>เบลอพื้นหลัง</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#f1f5f9', color: '#334155', padding: '6px 10px', borderRadius: '9999px', fontWeight: 'bold', fontSize: '11.5px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <button
-                        onClick={() => setIsShowSkeleton(!isShowSkeleton)}
-                        disabled={!isCameraOn}
-                        style={{
-                          width: '32px',
-                          height: '16px',
-                          borderRadius: '9999px',
-                          border: 'none',
-                          padding: '2px',
-                          cursor: isCameraOn ? 'pointer' : 'not-allowed',
-                          backgroundColor: isShowSkeleton ? '#0d47a1' : '#cbd5e1',
-                          opacity: isCameraOn ? 1 : 0.4,
-                          display: 'flex',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: '12px',
-                            height: '12px',
-                            borderRadius: '50%',
-                            backgroundColor: '#ffffff',
-                            transform: isShowSkeleton ? 'translateX(16px)' : 'translateX(0px)',
-                            transition: 'transform 0.3s'
-                          }}
-                        />
-                      </button>
-                      <span>แสดงโครงกระดูก</span>
-                    </div>
                   </div>
                 </div>
+
+                {/* 4. กล่องควบคุมกล้อง (component เดียวกับหน้าทบทวนไวยากรณ์) */}
+                <CameraControlBox
+                  isCameraOn={isCameraOn}
+                  onToggleCamera={toggleCamera}
+                  onSwitchCamera={switchCamera}
+                  isBlurBg={isBlurBg}
+                  onToggleBlur={() => setIsBlurBg(!isBlurBg)}
+                  isShowSkeleton={isShowSkeleton}
+                  onToggleSkeleton={() => setIsShowSkeleton(!isShowSkeleton)}
+                  compact={isShortView}
+                />
 
               </div>
 
@@ -1158,6 +1189,11 @@ export const StudentDashboard: React.FC = () => {
                 wordName={selectedWord}
                 categoryName={selectedCategory}
                 onBack={() => setSelectedWord(null)}
+                onOpenSentence={(length, id) => {
+                  setActiveTab('sentence');
+                  setSelectedSentenceLength(length);
+                  setSelectedSentenceId(id);
+                }}
               />
             ) : selectedCategory ? (
               <CategoryDetailPage
@@ -1170,7 +1206,26 @@ export const StudentDashboard: React.FC = () => {
             )
           )}
 
-          {/* 3. หน้าเกมส์ */}
+          {/* 3. หน้าตัวอย่างประโยค: เลือกกลุ่ม 3/4 คำ → เลือกประโยค → วิดีโอ + ไวยากรณ์ */}
+          {activeTab === 'sentence' && (
+            selectedSentenceLength && selectedSentenceId ? (
+              <SentenceDetailPage
+                length={selectedSentenceLength}
+                sentenceId={selectedSentenceId}
+                onBack={() => setSelectedSentenceId(null)}
+              />
+            ) : selectedSentenceLength ? (
+              <SentenceListPage
+                length={selectedSentenceLength}
+                onBack={() => setSelectedSentenceLength(null)}
+                onSelectSentence={(id) => setSelectedSentenceId(id)}
+              />
+            ) : (
+              <SentenceGroupPage onSelectLength={(length) => setSelectedSentenceLength(length)} />
+            )
+          )}
+
+          {/* 4. หน้าทบทวนไวยากรณ์ (GamePage — เกมจริงจะแยกทำเป็นเมนูใหม่ภายหลัง) */}
           {activeTab === 'game' && (
             <GamePage onCameraStatusChange={setIsCameraOn} />
           )}
