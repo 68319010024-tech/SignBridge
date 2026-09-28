@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements-docker.txt .
-RUN pip install --no-cache-dir -r requirements-docker.txt
+# tensorflow ~500MB — เน็ตของเซิร์ฟเวอร์หลุด/ช้าแล้ว pip ล้มทั้ง build (exit code 2) จึงให้รอนานขึ้นและลองซ้ำ
+RUN pip install --no-cache-dir --default-timeout=300 --retries 10 -r requirements-docker.txt
 
 COPY models ./models
 COPY src ./src
