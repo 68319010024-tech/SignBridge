@@ -1,0 +1,89 @@
+=======================================================================
+SignBridge - สรุปการทำงานของระบบ
+=======================================================================
+
+แนวคิดของระบบ
+---------------------------------------------------------------------
+เว็บแอปที่แปลภาษามือไทย (TSL) เป็นประโยคภาษาไทยแบบเรียลไทม์ผ่านกล้อง
+พร้อมมีพจนานุกรมคำศัพท์และเกมฝึกทบทวน
+
+
+สถาปัตยกรรมจริงที่ทำงานอยู่ (2 ส่วนหลัก)
+---------------------------------------------------------------------
+
+    [เบราว์เซอร์ผู้ใช้]  --WebSocket (ภาพจากกล้อง)-->  [AI Engine (Python)]
+       React frontend                                   MediaPipe + TensorFlow
+            <---------------- คำ/ประโยคที่แปลแล้ว -----------------
+
+
+1) Frontend  (frontend/src)  -  React + TypeScript + Tailwind
+---------------------------------------------------------------------
+- StudentDashboard.tsx
+    เปิดกล้อง, capture เฟรมทุก ~100ms (10 FPS) ส่งเป็น base64
+    ผ่าน WebSocket ไปยัง AI engine, รับผลลัพธ์กลับมาแสดงเป็นคำ/ประโยค
+    พร้อม toggle แสดงโครงกระดูก (skeleton overlay)
+
+- DictionaryPage / CategoryDetailPage / WordDetailPage
+    พจนานุกรมคำศัพท์แยกหมวด พร้อมวิดีโอสาธิตท่า
+
+- GamePage.tsx + quiz components
+    มินิเกมทบทวนคำศัพท์ (จับเวลา, feedback ถูก/ผิด)
+
+- wsConfig.ts
+    เลือก URL ของ WebSocket อัตโนมัติ
+    (localhost ตอน dev, หรือผ่าน reverse proxy /ai/ws/ ตอน deploy จริง)
+
+
+2) AI Engine  (ai-engine/src/server.py)  -  Python  (หัวใจหลักของระบบ)
+---------------------------------------------------------------------
+- รับเฟรมภาพผ่าน WebSocket
+- ใช้ MediaPipe Holistic สกัด landmark ของมือซ้าย/ขวา/ใบหน้า
+  (246 ค่าต่อเฟรม)
+- เมื่อตรวจพบมือ เริ่มบันทึกลำดับเฟรมเป็น "ท่าทาง" จนมือหายไปเกิน
+  0.7 วิ ถึงหยุดบันทึก
+- resample ลำดับเป็น 30 เฟรม, normalize พิกัด แล้วส่งเข้าโมเดล
+  TensorFlow (LSTM/1D-CNN) ที่เทรนไว้แล้ว (models/sign_model.h5)
+  เพื่อทำนายว่าเป็นคำอะไร (ต้องมั่นใจ >= 50%)
+- คำที่ทำนายได้ถูกสะสมเป็น buffer สูงสุด 5 คำ แล้วเมื่อไม่มีการ
+  เคลื่อนไหวนาน 5 วิ จะรัน translate_sentence()
+  ซึ่งเป็นอัลกอริทึมจัดลำดับคำแบบ rule-based ตามบทบาทไวยากรณ์
+  (Time -> Subject -> Negation -> Verb -> Object -> Question)
+  เพื่อแปลงลำดับคำแบบภาษามือให้เป็นประโยคภาษาไทยที่อ่านง่ายขึ้น
+- ส่งผลลัพธ์ (คำ, ความมั่นใจ, ประโยค, เฟรมภาพ skeleton ถ้าขอ)
+  กลับไปยัง frontend แบบสด
+
+
+ส่วนที่วางโครงไว้แต่ยังไม่ได้ implement
+---------------------------------------------------------------------
+- Backend (Node.js/Express)  -  backend/src
+    ไฟล์ทั้งหมด (app.ts, controllers, services เช่น
+    syntaxBridgeService.ts, trackingService.ts) ว่างเปล่า (0 บรรทัด)
+    ยังไม่มีโค้ดจริง
+
+- Database  -  database/schema.sql
+    ก็ว่างเปล่าเช่นกัน ยังไม่มี schema
+
+โครงสร้างที่ตั้งใจไว้เดิม (ตาม folder-structure/folder-structure.txt)
+คือให้ backend เป็นตัวกลางจัดการ tracking ความก้าวหน้านักเรียน/quiz
+และมี syntax bridge อยู่ฝั่ง backend แต่ในทางปฏิบัติ ตอนนี้ logic
+การแปลงประโยคถูกย้ายไปทำที่ ai-engine (Python) แทนทั้งหมด และ
+frontend คุยตรงกับ ai-engine โดยไม่ผ่าน backend เลย
+
+
+การ deploy จริง
+---------------------------------------------------------------------
+ดูจาก docker/docker-compose.deploy.yml - สแต็กที่ deploy บนเซิร์ฟเวอร์
+จริงมีแค่ 2 container:
+  - frontend    (Nginx เสิร์ฟ React build)
+  - ai-engine   (Python WebSocket server)
+เชื่อมผ่าน Nginx Proxy Manager ที่มีอยู่แล้ว
+  (path /ai/ -> frontend, /ai/ws/ -> ai-engine)
+ไม่มี backend/database ใน stack นี้
+
+
+สรุปสั้น ๆ
+---------------------------------------------------------------------
+ระบบจริงตอนนี้คือ React frontend คุยกับ Python AI engine
+(MediaPipe + TensorFlow) โดยตรง ส่วน backend Node.js กับฐานข้อมูล
+เป็นแค่โครงที่วางไว้สำหรับอนาคต (เช่น เก็บสถิติการเรียน) แต่ยังไม่มี
+โค้ดใช้งานจริง

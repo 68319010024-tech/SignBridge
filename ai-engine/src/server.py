@@ -13,19 +13,17 @@ import tensorflow as tf
 import mediapipe as mp
 import websockets
 
+import features as F
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODELS_DIR = os.path.join(BASE_DIR, "models")
+# v4 = มือ + หน้า + pose ช่วงบน + feature ระยะ/รูปมือ/ความเร็ว (features.py), รวม "ไม่ใช่" เข้ากับ "ไม่"
+# โมเดลเดิม 246 ค่ายังอยู่ที่ models/sign_model.h5 และ v2 ที่ models/v2 (ใช้กับ features.py เวอร์ชันนี้ไม่ได้)
+MODELS_DIR = os.path.join(BASE_DIR, "models", "v4")
 MODEL_PATH = os.path.join(MODELS_DIR, "sign_model.h5")
 LABEL_MAP_PATH = os.path.join(MODELS_DIR, "label_map.json")
 
 HOST = "0.0.0.0"
 PORT = 8000
-
-# ดึงเฉพาะคิ้ว ตา และปาก (40 จุด = 120 ค่า)
-FACE_INDICES = [
-    61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 146, 91, 181, 84, 17, 314, 405, 321, 375, # Lips
-    70, 63, 105, 66, 107, 336, 296, 334, 293, 300, 55, 65, 52, 53, 285, 295, 282, 283, 33, 263 # Eyebrows & Eyes
-]
 
 # ----------------------------------------------------------------------------
 # Syntax Bridge Transformation Algorithm (Rule-Based Matrix)
@@ -62,9 +60,24 @@ VOCAB_ROLE_MAP = {
 ROLE_ORDER = ["Time", "Subject", "Negation", "Verb", "Object", "Question"]
 
 MAX_BUFFER_WORDS = 5
-IDLE_THRESHOLD = 0.7      
+IDLE_THRESHOLD = F.IDLE_THRESHOLD  # ต้องตรงกับที่ใช้ตัดท่าตอนเทรน
 SENTENCE_TIMEOUT = 5.0
+# ประโยคที่แปลเสร็จแสดงค้างไว้กี่วินาที แล้วล้างทิ้ง (หน้าเว็บย้ายไปกล่อง "ประโยคล่าสุด")
+SENTENCE_DISPLAY_SECONDS = 20.0
 CONFIDENCE_THRESHOLD = 0.50  # เกณฑ์กรองความมั่นใจขั้นต่ำ 50%
+
+# ตัวเตือน "อยู่ใกล้กล้องเกินไป": วัดความกว้างไหล่ (หน่วยเป็นสัดส่วนของความสูงภาพ)
+# ใน dataset ค่ากลาง ~0.29 แต่กล้องเว็บแคมมุมแคบกว่า ทดสอบจริงแล้วระยะที่ทายได้ดีที่สุดวัดได้ ~0.40-0.44
+# และใกล้จนทายพังอยู่ที่ ~0.56 จึงตั้งเกณฑ์ไว้ระหว่างสองช่วงนี้ (อย่าอิงแค่ค่าจาก dataset — จะเตือนตลอด)
+# ใช้ 2 เกณฑ์ (เปิดที่ 0.52 ปิดที่ 0.47) กันไม่ให้ข้อความกะพริบเวลาค่าแกว่งอยู่ใกล้เส้น
+TOO_CLOSE_ON = 0.52
+TOO_CLOSE_OFF = 0.47
+SHOULDER_EMA_ALPHA = 0.2
+# ตอนใกล้มากจนเห็นแต่หน้า pose มักหาไหล่ไม่เจอ จึงประมาณความกว้างไหล่จากความสูงใบหน้าแทน
+# (ใน dataset ความสูงใบหน้า ≈ 0.476 เท่าของความกว้างไหล่ ช่วง 5-95% คือ 0.44-0.52)
+FACE_TO_SHOULDER_RATIO = 0.476
+# ไม่เห็นทั้งตัวและหน้า — คงสถานะเตือนไว้สักพักก่อนล้าง (ใกล้มาก ๆ ก็ตรวจไม่เจอได้เหมือนกัน)
+DISTANCE_HOLD_SECONDS = 1.5
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -94,51 +107,6 @@ def translate_sentence(word_list):
     ordered_words.extend(unknown_words)
 
     return " ".join(ordered_words)
-
-
-def normalize_landmarks_frame(frame):
-    norm_frame = np.copy(frame)
-
-    if np.any(norm_frame[:63]):
-        lh = norm_frame[:63].reshape(21, 3)
-        lh = lh - lh[0]
-        max_val = np.max(np.abs(lh))
-        if max_val > 0:
-            lh = lh / max_val
-        norm_frame[:63] = lh.flatten()
-
-    if np.any(norm_frame[63:126]):
-        rh = norm_frame[63:126].reshape(21, 3)
-        rh = rh - rh[0]
-        max_val = np.max(np.abs(rh))
-        if max_val > 0:
-            rh = rh / max_val
-        norm_frame[63:126] = rh.flatten()
-
-    if np.any(norm_frame[126:]):
-        face = norm_frame[126:].reshape(-1, 3)
-        face = face - face[0]
-        max_val = np.max(np.abs(face))
-        if max_val > 0:
-            face = face / max_val
-        norm_frame[126:] = face.flatten()
-
-    return norm_frame
-
-
-def resample_sequence(sequence, target_frames=30):
-    total = len(sequence)
-    if total == 0:
-        return np.zeros((target_frames, 246))
-    if total <= target_frames:
-        indices = np.linspace(0, total - 1, total).astype(int)
-        sampled = [sequence[i] for i in indices]
-        padding = [np.zeros(246) for _ in range(target_frames - total)]
-        sampled.extend(padding)
-    else:
-        indices = np.linspace(0, total - 1, target_frames).astype(int)
-        sampled = [sequence[i] for i in indices]
-    return np.array(sampled)
 
 
 def decode_frame(base64_image: str):
@@ -174,10 +142,23 @@ mp_holistic = mp.solutions.holistic
 mp_drawing = mp.solutions.drawing_utils
 
 
+# แขน/ไหล่ที่โมเดลใช้ (ไหล่-ไหล่, ไหล่-ศอก-ข้อมือ ทั้งสองข้าง)
+UPPER_BODY_CONNECTIONS = [(11, 12), (11, 13), (13, 15), (12, 14), (14, 16)]
+
+
 def draw_skeleton(image_bgr, results):
+    h, w, _ = image_bgr.shape
+    if results.pose_landmarks:
+        lms = results.pose_landmarks.landmark
+        for a, b in UPPER_BODY_CONNECTIONS:
+            pa = (int(lms[a].x * w), int(lms[a].y * h))
+            pb = (int(lms[b].x * w), int(lms[b].y * h))
+            cv2.line(image_bgr, pa, pb, (255, 160, 0), 2)
+        for idx in F.MODEL_POSE_INDICES:
+            cv2.circle(image_bgr, (int(lms[idx].x * w), int(lms[idx].y * h)), 4, (255, 160, 0), -1)
+
     if results.face_landmarks:
-        h, w, _ = image_bgr.shape
-        for idx in FACE_INDICES:
+        for idx in F.FACE_INDICES:
             pt = results.face_landmarks.landmark[idx]
             cv2.circle(image_bgr, (int(pt.x * w), int(pt.y * h)), 1, (0, 255, 255), -1)
 
@@ -197,10 +178,28 @@ def load_model_and_labels():
     with open(LABEL_MAP_PATH, "r", encoding="utf-8") as f:
         label_map = json.load(f)
     rev_label_map = {v: k for k, v in label_map.items()}
+    expected = (None, F.TARGET_FRAMES, F.NUM_FEATURES)
+    if tuple(model.input_shape) != expected:
+        raise ValueError(f"โมเดล {MODEL_PATH} รับ input {model.input_shape} แต่ features.py สร้าง {expected}")
     return model, rev_label_map
 
 
 MODEL_LOCK = threading.Lock()
+
+# โหมดบันทึกท่าตอนทดสอบ (ปิดเป็นค่าเริ่มต้น): ตั้ง env SIGNBRIDGE_RECORD_DIR เพื่อบันทึกพิกัด landmark
+# ของทุกท่าที่ทำนาย (ไม่บันทึกภาพ) ไว้เทียบกับข้อมูลเทรน/ใช้เพิ่มข้อมูล ชื่อไฟล์มีคำที่ทายและความมั่นใจ
+RECORD_DIR = os.environ.get("SIGNBRIDGE_RECORD_DIR")
+
+
+def record_gesture(raw_gesture, word, confidence):
+    if not RECORD_DIR:
+        return
+    try:
+        os.makedirs(RECORD_DIR, exist_ok=True)
+        name = f"{time.strftime('%Y%m%d-%H%M%S')}-{int(time.time() * 1000) % 1000:03d}_{word}_{confidence:.2f}.npy"
+        np.save(os.path.join(RECORD_DIR, name), raw_gesture)
+    except Exception:
+        log.warning("failed to record gesture", exc_info=True)
 
 
 class GestureSession:
@@ -220,6 +219,12 @@ class GestureSession:
 
         self.word_buffer = []
         self.transformed_sentence = ""
+        self.sentence_time = 0.0
+        # นับรอบการล้างประโยค (client สั่ง reset_sentence ตอนเริ่มอัด/กดล้าง) — ส่งกลับไปกับทุกข้อความ
+        # ให้ client ทิ้งข้อมูลประโยคเก่าที่ยังค้างอยู่ในข้อความก่อนที่ server จะล้างเสร็จ
+        self.sentence_epoch = 0
+        # ตั้งจาก receiver (asyncio) แล้วค่อยล้างจริงใน process_frame (thread เดียวกับที่แก้ word_buffer)
+        self.reset_sentence_requested = False
         self.translated_word = "-"
         self.confidence = 0.0
 
@@ -227,44 +232,73 @@ class GestureSession:
         # ฝั่ง client ใช้ค่านี้แยกแยะ "ท่าทางใหม่" ออกจาก "ค่าเดิมที่ backend ยังไม่อัปเดต"
         # เพื่อไม่ให้ตรวจจับคำเดิมซ้ำ ๆ ทั้งที่ผู้ใช้วางมือลงไปแล้วและยังไม่ได้ทำท่าใหม่
         self.prediction_id = 0
+        # เพิ่มขึ้นทุกครั้งที่จบท่าแล้วความมั่นใจต่ำเกินเกณฑ์ (ไม่นับเป็นคำ) — client ใช้แสดง "ไม่ชัดเจน ลองใหม่"
+        self.rejected_id = 0
 
         self.frame_count = 0
+
+        self.shoulder_width_ema = None
+        self.too_close = False
+        self.last_body_time = 0.0
 
     def close(self):
         self.holistic.close()
 
+    def _update_distance(self, raw_frame):
+        pose = raw_frame[F.POSE_SLICE].reshape(F.NUM_POSE_RAW, 4)
+        face = raw_frame[F.FACE_SLICE].reshape(-1, 3)
+        # ใช้ไหล่เป็นหลัก ส่วนขนาดหน้าใช้เฉพาะตอนหา pose ไม่เจอ เพราะหน้าแกว่งกว่า (ก้ม/เงย/มือบังหน้า)
+        # ถ้าเอาหน้ามาคิดด้วยทุกเฟรม คลิประยะปกติใน dataset จะโดนเตือนผิด ~2%
+        if np.any(pose):
+            width = float(np.linalg.norm(pose[F.POSE_SHOULDER_L, :2] - pose[F.POSE_SHOULDER_R, :2]))
+        elif np.any(face):
+            width = float(face[:, 1].max() - face[:, 1].min()) / FACE_TO_SHOULDER_RATIO
+        else:
+            if time.time() - self.last_body_time > DISTANCE_HOLD_SECONDS:
+                # ไม่เห็นคนนานพอแล้ว (ออกจากเฟรม) — ล้างค่า ไม่ค้างคำเตือนไว้
+                self.shoulder_width_ema = None
+                self.too_close = False
+            return
+        self.last_body_time = time.time()
+        if self.shoulder_width_ema is None:
+            self.shoulder_width_ema = width
+        else:
+            self.shoulder_width_ema += SHOULDER_EMA_ALPHA * (width - self.shoulder_width_ema)
+        if self.too_close:
+            self.too_close = self.shoulder_width_ema > TOO_CLOSE_OFF
+        else:
+            self.too_close = self.shoulder_width_ema > TOO_CLOSE_ON
+
+    def request_sentence_reset(self):
+        self.reset_sentence_requested = True
+
     def process_frame(self, image_bgr, show_skeleton: bool):
         self.frame_count += 1
+        if self.reset_sentence_requested:
+            self.reset_sentence_requested = False
+            self.word_buffer = []
+            self.transformed_sentence = ""
+            self.sentence_epoch += 1
+            log.info("sentence reset by client (epoch %d)", self.sentence_epoch)
         _t0 = time.time()
 
         image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
         results = self.holistic.process(image_rgb)
         _elapsed_ms = (time.time() - _t0) * 1000
 
-        lh = np.zeros(21 * 3)
-        rh = np.zeros(21 * 3)
-        face = np.zeros(len(FACE_INDICES) * 3)
-        has_hand = False
-
-        if results.face_landmarks:
-            face = np.array([[results.face_landmarks.landmark[i].x,
-                               results.face_landmarks.landmark[i].y,
-                               results.face_landmarks.landmark[i].z] for i in FACE_INDICES]).flatten()
-
-        if results.left_hand_landmarks:
-            has_hand = True
-            lh = np.array([[p.x, p.y, p.z] for p in results.left_hand_landmarks.landmark]).flatten()
-
-        if results.right_hand_landmarks:
-            has_hand = True
-            rh = np.array([[p.x, p.y, p.z] for p in results.right_hand_landmarks.landmark]).flatten()
+        img_h, img_w = image_bgr.shape[:2]
+        # ลบมือที่วางพักต่ำกว่าแนวอกออก (เหมือนตอนเทรน) — มือที่พักอยู่ในเฟรมจะไม่ทำให้บันทึกท่าค้างไว้
+        frame_features = F.drop_resting_hands(F.extract_raw_frame(results, img_w, img_h))
+        has_hand = F.has_hand(frame_features)
+        self._update_distance(frame_features)
 
         if self.frame_count % 50 == 1:
             log.info(
-                "frame #%d shape=%s mean=%.1f holistic.process=%.0fms has_pose=%s has_face=%s has_hand=%s is_recording=%s buffer_len=%d",
+                "frame #%d shape=%s mean=%.1f holistic.process=%.0fms has_pose=%s has_face=%s has_hand=%s is_recording=%s buffer_len=%d shoulder_w=%s too_close=%s",
                 self.frame_count, image_bgr.shape, float(image_bgr.mean()), _elapsed_ms,
                 bool(results.pose_landmarks), bool(results.face_landmarks), has_hand,
                 self.is_recording, len(self.gesture_sequence),
+                None if self.shoulder_width_ema is None else round(self.shoulder_width_ema, 3), self.too_close,
             )
 
         if has_hand:
@@ -273,21 +307,20 @@ class GestureSession:
                 self.is_recording = True
                 self.gesture_sequence = []
 
-        frame_features = np.concatenate([lh, rh, face])
-
         if self.is_recording:
             if has_hand:
                 self.gesture_sequence.append(frame_features)
             elif time.time() - self.last_hand_time > IDLE_THRESHOLD:
                 self.is_recording = False
-                if len(self.gesture_sequence) >= 5:
-                    sampled_seq = resample_sequence(self.gesture_sequence, target_frames=30)
-                    norm_seq = np.array([normalize_landmarks_frame(f) for f in sampled_seq])
+                if len(self.gesture_sequence) >= F.MIN_GESTURE_FRAMES:
+                    raw_gesture = np.array(self.gesture_sequence)
+                    model_input = F.prepare_gesture(raw_gesture)
 
                     with MODEL_LOCK:
-                        res = self.model.predict(np.expand_dims(norm_seq, axis=0), verbose=0)[0]
-                    best_idx = int(np.argmax(res))
-                    confidence = float(res[best_idx])
+                        res = self.model.predict(np.expand_dims(model_input, axis=0), verbose=0)[0]
+                    # กฎหลังโมเดล เช่น "โทรศัพท์" ต้องเอามือแนบหู
+                    best_idx, confidence = F.apply_rules(res, raw_gesture, self.rev_label_map)
+                    record_gesture(raw_gesture, self.rev_label_map[best_idx], confidence)
 
                     if confidence >= CONFIDENCE_THRESHOLD:
                         self.translated_word = self.rev_label_map[best_idx]
@@ -300,14 +333,20 @@ class GestureSession:
                         ):
                             self.word_buffer.append(self.translated_word)
                     else:
+                        self.rejected_id += 1
                         log.info("ignored low confidence prediction: %.1f%%", confidence * 100)
                 
                 self.gesture_sequence = []
 
         if self.word_buffer and (time.time() - self.last_hand_time) > SENTENCE_TIMEOUT:
             self.transformed_sentence = translate_sentence(self.word_buffer)
+            self.sentence_time = time.time()
             log.info("sentence: %s => %s", " -> ".join(self.word_buffer), self.transformed_sentence)
             self.word_buffer = []
+
+        if self.transformed_sentence and time.time() - self.sentence_time > SENTENCE_DISPLAY_SECONDS:
+            log.info("sentence expired after %.0fs: %s", SENTENCE_DISPLAY_SECONDS, self.transformed_sentence)
+            self.transformed_sentence = ""
 
         frame_b64 = None
         if show_skeleton:
@@ -318,8 +357,12 @@ class GestureSession:
             "word": self.translated_word,
             "confidence": self.confidence,
             "prediction_id": self.prediction_id,
+            "too_close": self.too_close,
+            "is_recording": self.is_recording,
+            "rejected_id": self.rejected_id,
             "tsl_sequence": list(self.word_buffer),
             "sentence": self.transformed_sentence,
+            "sentence_epoch": self.sentence_epoch,
             "frame": frame_b64,
         }
 
@@ -344,6 +387,10 @@ async def handle_client(websocket, model, rev_label_map):
             if page and seen_page["value"] != page:
                 seen_page["value"] = page
                 log.info("client %s identified as page=%s", websocket.remote_address, page)
+
+            # คำสั่งจาก client: ล้างคำสะสม/ประโยคที่แปลแล้ว (ปุ่มเริ่มอัดประโยค / ล้างประโยค)
+            if payload.get("command") == "reset_sentence":
+                session.request_sentence_reset()
 
             base64_image = payload.get("image")
             if not base64_image:
