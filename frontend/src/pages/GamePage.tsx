@@ -19,7 +19,7 @@ import {
   Aperture
 } from 'lucide-react';
 import { resolveWsUrl } from '../services/wsConfig';
-import { useIsMobileView, useIsShortView } from '../hooks/useIsMobileView';
+import { useIsMobileView, useIsShortView, useIsTabletPortrait } from '../hooks/useIsMobileView';
 import { PageBadge } from '../components/common/PageBadge';
 import { MobileControlButton } from '../components/common/MobileControlButton';
 import TooCloseWarning from '../components/webcam/TooCloseWarning';
@@ -285,6 +285,12 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
   // จอแท็บเล็ต (เช่น iPad แนวนอน) ยังใช้ layout ฝั่งซ้าย/ขวาแบบ desktop อยู่ (ไม่ต้องสแต็กแนวตั้ง)
   // แต่สูงไม่พอให้แผงควบคุมขวา 5 กล่องพอดีเป๊ะแบบจอใหญ่ เลยต้องเปิด scroll ให้แถวนี้ไว้เป็นทางเลือก
   const isTabletView = useIsMobileView(1366);
+  // กล่องคอลัมน์ขวาแบบย่อ: จอเตี้ย หรือแท็บเล็ตแนวนอน (iPad 1180x820 สูงไม่พอให้ 5 กล่องขนาดเต็ม)
+  const compactColumn = isShortView || isTabletView;
+  // จอเตี้ยมาก (เช่นโน้ตบุ๊ก 1280x720): กล่องเวลา/คะแนนวางหัวกล่องกับค่าเป็นแถวเดียว ให้คอลัมน์ขวาไม่เกินขอบล่างกล้อง
+  const isTightColumn = useIsShortView(740);
+  // iPad แนวตั้ง: ใช้กล่องชุดเดียวกับ PC เรียงใต้กล้อง
+  const isTabletPortrait = useIsTabletPortrait();
   const [gameState, setGameState] = useState<'select' | 'playing' | 'result'>('select');
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   
@@ -902,9 +908,232 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
   });
   const statusLook = describeStatus(detectionStatus);
 
+  // กระดานโจทย์ — โหมดง่าย: ซ้ายโจทย์ ขวาผลตรวจจับ (แบบกล่องผลคำเดี่ยวในหน้าหลัก)
+  // โหมดกลาง/ยาก: โจทย์ภาษาไทย (ซ้าย) / ท่าที่ทำได้ตามลำดับภาษามือ (ขวา)
+  const syntaxBoard = (
+    difficulty === 'easy' ? (
+    <div style={{ ...homeCardStyle, height: '116px', display: 'flex', alignItems: 'stretch', flexShrink: 0 }}>
+      <Hand style={{ ...homeWatermarkStyle, width: '130px', height: '130px', right: '-20px', top: '-18px' }} />
+      {[
+        {
+          icon: Flag,
+          label: 'โจทย์ (ภาษาไทย)',
+          content: isTimerRunning ? (
+            <span key={currentQ.wordOnly} className="sb-word-pop" style={{ fontSize: '30px', fontWeight: 800, color: '#0d47a1', lineHeight: 1.2 }}>{currentQ.wordOnly}</span>
+          ) : null
+        },
+        {
+          icon: Aperture,
+          label: 'ผลการตรวจจับคำเดี่ยว',
+          content: isTimerRunning ? (
+            wordEvent ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <span key={wordEvent.id} className="sb-word-pop" style={{ fontSize: '30px', fontWeight: 800, color: '#0d47a1', lineHeight: 1.2 }}>{wordEvent.word}</span>
+                {/* แถบความมั่นใจ (เหมือนหน้าหลัก) */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '110px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#16a34a' }}>ความมั่นใจ {wordEvent.confidence}%</span>
+                  <div style={{ height: '6px', borderRadius: '9999px', backgroundColor: '#e2e8f0', overflow: 'hidden' }}>
+                    <div style={{ width: `${wordEvent.confidence}%`, height: '100%', borderRadius: '9999px', background: 'linear-gradient(90deg, #22c55e, #16a34a)', transition: 'width 0.4s ease' }} />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <span style={{ fontSize: '15px', fontWeight: 700, color: '#94a3b8', lineHeight: '36px' }}>ทำท่าภาษามือหน้ากล้อง</span>
+            )
+          ) : null
+        }
+      ].map((half, i) => (
+        <React.Fragment key={half.label}>
+          {i > 0 && <div style={{ width: '1px', background: 'linear-gradient(180deg, transparent, #dce8f7 20%, #dce8f7 80%, transparent)', flexShrink: 0 }} />}
+          <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', gap: '18px', minWidth: 0 }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: BLUE_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 20px -10px rgba(22,98,196,0.7)', flexShrink: 0 }}>
+              <half.icon style={{ width: '28px', height: '28px', color: '#ffffff' }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+              <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#64748b' }}>{half.label}</span>
+              {half.content ?? <span style={{ fontSize: '15px', fontWeight: 700, color: '#94a3b8', lineHeight: '36px' }}>กด START เพื่อเริ่มทบทวน</span>}
+            </div>
+          </div>
+        </React.Fragment>
+      ))}
+    </div>
+    ) : (
+    // SYNTAX BOARD (กลาง/ยาก): โจทย์ภาษาไทย (ซ้าย) / ท่าที่ทำได้ตามลำดับภาษามือ (ขวา)
+    <div style={{ ...homeCardStyle, height: '116px', display: 'flex', alignItems: 'stretch', flexShrink: 0 }}>
+      <Hand style={{ ...homeWatermarkStyle, width: '130px', height: '130px', right: '-20px', top: '-18px' }} />
+
+      {/* ฝั่งซ้าย: โจทย์ */}
+      <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '14px 18px', minWidth: 0 }}>
+        <BoxHeader icon={Flag} title="ไวยากรณ์ภาษาไทย" />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          {isTimerRunning ? (
+            (
+              currentQ.thaiGrammar.map((item, idx) => (
+                <React.Fragment key={idx}>
+                  {idx > 0 && <ChevronRight style={{ width: '14px', height: '14px', color: '#94a3b8' }} />}
+                  {/* สีประจำคำ + เลขลำดับที่ต้องทำในภาษามือ */}
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '17px', fontWeight: 800, color: item.color, backgroundColor: `${item.color}14`, border: `1px solid ${item.color}33`, padding: '3px 10px 3px 12px', borderRadius: '10px' }}>
+                    {item.word}
+                    <span style={{ width: '18px', height: '18px', borderRadius: '50%', backgroundColor: item.color, color: '#ffffff', fontSize: '11px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {getSignOrderIndex(currentQ, item.word)}
+                    </span>
+                  </span>
+                </React.Fragment>
+              ))
+            )
+          ) : (
+            <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: 700 }}>กด START เพื่อเริ่มทบทวน</span>
+          )}
+        </div>
+      </div>
+
+      <div style={{ width: '1px', background: 'linear-gradient(180deg, transparent, #dce8f7 20%, #dce8f7 80%, transparent)', flexShrink: 0 }} />
+
+      {/* ฝั่งขวา: ท่าที่ตรวจจับได้ตามลำดับภาษามือ */}
+      <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '14px 18px', minWidth: 0 }}>
+        <BoxHeader icon={Hand} title="ไวยากรณ์ภาษามือไทย" />
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          {isTimerRunning ? (
+            (
+              // ช่องตามจำนวนคำของโจทย์: ล็อคแล้ว = น้ำเงินทึบ, ช่องที่กำลังรอ = คำที่ AI เห็นล่าสุด
+              // (กรอบส้ม ไม่ว่าจะถูกหรือผิด ให้เห็นว่าระบบกำลังอ่านอะไร), ยังไม่ถึง = ช่องประ
+              currentQ.signGrammar.map((_, idx) => {
+                const isLocked = idx < lockedWords.length;
+                const isLiveSlot = idx === lockedWords.length;
+                const liveWord = isLiveSlot ? wordEvent?.word : null;
+                const display = isLocked ? lockedWords[idx] : liveWord;
+                return (
+                  <React.Fragment key={idx}>
+                    {idx > 0 && <ChevronRight style={{ width: '14px', height: '14px', color: '#94a3b8' }} />}
+                    {display ? (
+                      <span style={{ fontSize: '17px', fontWeight: 800, padding: '3px 12px', borderRadius: '10px', color: isLocked ? '#ffffff' : '#c2410c', background: isLocked ? BLUE_GRADIENT : '#fff7ed', border: isLocked ? '1px solid transparent' : '1px solid #fdba74' }}>
+                        {display}
+                      </span>
+                    ) : (
+                      <span style={{ minWidth: '44px', textAlign: 'center', fontSize: '15px', fontWeight: 800, padding: '3px 10px', borderRadius: '10px', color: isLiveSlot ? '#1662c4' : '#cbd5e1', border: `1.5px dashed ${isLiveSlot ? '#93c5fd' : '#dbe3ee'}` }}>
+                        {idx + 1}
+                      </span>
+                    )}
+                  </React.Fragment>
+                );
+              })
+            )
+          ) : (
+            <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: 700 }}>กด START เพื่อเริ่มทบทวน</span>
+          )}
+        </div>
+      </div>
+    </div>
+    )
+  );
+
+  // ปุ่ม START — สูง 116px เท่ากระดานโจทย์ ขอบบนล่างจะได้ตรงกัน
+  const startBox = (
+    <div style={{ ...homeCardStyle, height: '116px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
+      <Play style={{ ...homeWatermarkStyle, width: '84px', height: '84px', right: '-14px', top: '-14px' }} />
+      <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+        <button
+          onClick={handlePressStart}
+          disabled={isTimerRunning}
+          className={isTimerRunning ? undefined : 'sb-start-btn'}
+          style={{
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            background: isTimerRunning ? '#e2e8f0' : BLUE_GRADIENT,
+            border: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: isTimerRunning ? 'not-allowed' : 'pointer',
+            boxShadow: isTimerRunning ? 'none' : '0 8px 18px -6px rgba(22,98,196,0.65)',
+            flexShrink: 0
+          }}
+        >
+          <Play style={{ width: '28px', height: '28px', color: isTimerRunning ? '#94a3b8' : '#ffffff', marginLeft: '4px', fill: isTimerRunning ? '#94a3b8' : '#ffffff' }} />
+        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+          <span style={{ fontSize: '18px', fontWeight: 800, color: isTimerRunning ? '#94a3b8' : '#0d47a1' }}>{isTimerRunning ? 'กำลังฝึก' : 'START'}</span>
+          <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8' }}>{isTimerRunning ? 'ทำท่าหน้ากล้องได้เลย' : 'กดเพื่อเริ่มจับเวลา'}</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  // เวลาถอยหลัง — วงแหวนนับถอยหลังตามเวลาที่เหลือ (แดงเมื่อเหลือ ≤ 10 วินาที)
+  const timerBox = (
+    <div style={{ ...homeCardStyle, padding: compactColumn ? '10px 14px' : '14px', display: 'flex', flexDirection: isTightColumn ? 'row' : 'column', alignItems: isTightColumn ? 'center' : undefined, justifyContent: isTightColumn ? 'space-between' : 'center', gap: compactColumn ? '4px' : '6px', flexShrink: 0 }}>
+      <Timer style={{ ...homeWatermarkStyle, width: '84px', height: '84px', right: '-14px', top: '-14px' }} />
+      <BoxHeader icon={Timer} title="เวลาถอยหลัง" size={compactColumn ? 'sm' : 'md'} />
+      {(() => {
+        const ring = isTightColumn ? 52 : compactColumn ? 60 : 72;
+        const radius = ring / 2 - 5;
+        const circumference = 2 * Math.PI * radius;
+        const ratio = Math.max(0, Math.min(1, timeLeft / difficultyMeta[difficulty].timeLimit));
+        const danger = timeLeft <= 10;
+        return (
+          <div style={{ position: 'relative', alignSelf: 'center', width: `${ring}px`, height: `${ring}px` }}>
+            <svg width={ring} height={ring} style={{ transform: 'rotate(-90deg)' }}>
+              <circle cx={ring / 2} cy={ring / 2} r={radius} fill="none" stroke="#e8f1fd" strokeWidth="6" />
+              <circle
+                cx={ring / 2}
+                cy={ring / 2}
+                r={radius}
+                fill="none"
+                stroke={danger ? '#ef4444' : '#1662c4'}
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={-circumference * (1 - ratio)}
+                style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s ease' }}
+              />
+            </svg>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ fontSize: isTightColumn ? '18px' : compactColumn ? '20px' : '24px', fontWeight: 800, color: danger ? '#ef4444' : '#1e293b', lineHeight: 1 }}>{timeLeft}</span>
+              <span style={{ fontSize: '9.5px', fontWeight: 600, color: '#64748b', marginTop: '2px' }}>วินาที</span>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+
+  // คะแนนสะสม
+  const scoreBox = (
+    <div style={{ ...homeCardStyle, flex: 1, minHeight: 'min-content', padding: compactColumn ? '10px 14px' : '14px', display: 'flex', flexDirection: isTightColumn ? 'row' : 'column', alignItems: isTightColumn ? 'center' : undefined, gap: '6px' }}>
+      <Award style={{ ...homeWatermarkStyle, width: '96px', height: '96px', right: '-18px', top: '-16px' }} />
+      <BoxHeader icon={Award} title="คะแนนสะสม" size={compactColumn ? 'sm' : 'md'} />
+      <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
+          <span key={score} className="sb-score-pop" style={{ fontSize: isTightColumn ? '28px' : compactColumn ? '32px' : '40px', fontWeight: 800, color: '#1e293b' }}>{score}</span>
+          {score > 0 && (
+            <span key={`gain-${score}`} className="sb-score-gain" style={{ position: 'absolute', left: '100%', top: '-2px', marginLeft: '2px', fontSize: '17px', fontWeight: 800, color: '#16a34a', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
+              +{POINTS_PER_CORRECT}
+            </span>
+          )}
+          <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8' }}>คะแนน</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  // กล่องควบคุมกล้อง (component เดียวกับหน้าหลัก)
+  const cameraControlBox = (
+    <CameraControlBox
+      isCameraOn={isCameraOn}
+      onToggleCamera={toggleCamera}
+      onSwitchCamera={switchCamera}
+      isBlurBg={isBlurBg}
+      onToggleBlur={() => setIsBlurBg(!isBlurBg)}
+      isShowSkeleton={isShowSkeleton}
+      onToggleSkeleton={() => setIsShowSkeleton(!isShowSkeleton)}
+      compact={compactColumn}
+    />
+  );
+
   return (
     // ไม่ใส่ padding ของตัวเอง: <main> ใน StudentDashboard ใส่ padding ไว้แล้ว ถ้าซ้อนอีกชั้นกล้องจะเล็กกว่าหน้าหลัก
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 0, background: 'radial-gradient(circle at 100% 0%, #f0f7ff 0%, #eaf1fb 45%)', color: '#1e293b', height: isMobileView ? 'auto' : '100%', boxSizing: 'border-box' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 0, background: 'radial-gradient(circle at 100% 0%, #f0f7ff 0%, #eaf1fb 45%)', color: '#1e293b', height: isMobileView && !isTabletPortrait ? 'auto' : '100%', boxSizing: 'border-box' }}>
 
       <style>{`
         @keyframes sb-game-fade-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -1043,7 +1272,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
 
       {/* 2. หน้าเล่นเกมส์หลัก — บนมือถือ/แท็บเล็ตใช้ layout สแต็กแนวตั้ง + ปุ่มไอคอนย่อ
           (เหมือนหน้า Student) แทนแผงควบคุม 220px คงที่ที่ใช้งานไม่ได้บนจอแคบ */}
-      {gameState === 'playing' && (isMobileView ? (
+      {gameState === 'playing' && (isMobileView && !isTabletPortrait ? (
         <div className="sb-game-fade" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
           {/* SYNTAX BOARD (ย่อ) */}
@@ -1184,6 +1413,27 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
             />
           </div>
         </div>
+      ) : isTabletPortrait ? (
+        // แท็บเล็ตแนวตั้ง: กล่องชุดเดียวกับ PC — แถวบน (กระดานโจทย์ | START) เหมือน PC, กล้องยืดเต็มที่ว่าง,
+        // แถวล่างเรียงกล่องในคอลัมน์ขวาของ PC เป็น 3 ช่อง ทั้งหมดพอดีจอเดียวไม่ต้องเลื่อน
+        <div className="sb-game-fade" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <style>{GAME_BOX_STYLES}</style>
+          <div style={{ display: 'flex', gap: '16px', flexShrink: 0 }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>{syntaxBoard}</div>
+            <div style={{ width: '220px', flexShrink: 0, display: 'flex', flexDirection: 'column' }}>{startBox}</div>
+          </div>
+
+          {gameCameraBox}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '16px', flexShrink: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <DetectionStatusBox status={detectionStatus} height={84} />
+              {scoreBox}
+            </div>
+            {timerBox}
+            {cameraControlBox}
+          </div>
+        </div>
       ) : (
         /* จอ desktop จริง (>1366px) คง overflow: hidden ไว้ตามเดิม เพราะสูงพอให้แผงขวาพอดีเป๊ะอยู่แล้ว
            ส่วนจอแท็บเล็ต (iPad แนวนอน) เปิด auto ไว้เป็นทางเลื่อนสำรอง กันแผงขวาโดนตัดจนกดใช้ไม่ได้ */
@@ -1191,314 +1441,21 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
 
           {/* ฝั่งซ้าย: SYNTAX BOARD (ด้านบน) + WEBCAM DISPLAY (ด้านล่าง) */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '16px', overflow: 'hidden' }}>
-            
-            {/* SYNTAX BOARD (โหมดง่าย): แบบเดียวกับกล่องผลตรวจจับคำเดี่ยวในหน้าหลัก — ซ้ายโจทย์ ขวาผลตรวจจับ */}
-            {difficulty === 'easy' ? (
-            <div style={{ ...homeCardStyle, height: '116px', display: 'flex', alignItems: 'stretch', flexShrink: 0 }}>
-              <Hand style={{ ...homeWatermarkStyle, width: '130px', height: '130px', right: '-20px', top: '-18px' }} />
-              {[
-                {
-                  icon: Flag,
-                  label: 'โจทย์ (ภาษาไทย)',
-                  content: isTimerRunning ? (
-                    <span key={currentQ.wordOnly} className="sb-word-pop" style={{ fontSize: '30px', fontWeight: 800, color: '#0d47a1', lineHeight: 1.2 }}>{currentQ.wordOnly}</span>
-                  ) : null
-                },
-                {
-                  icon: Aperture,
-                  label: 'ผลการตรวจจับคำเดี่ยว',
-                  content: isTimerRunning ? (
-                    wordEvent ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <span key={wordEvent.id} className="sb-word-pop" style={{ fontSize: '30px', fontWeight: 800, color: '#0d47a1', lineHeight: 1.2 }}>{wordEvent.word}</span>
-                        {/* แถบความมั่นใจ (เหมือนหน้าหลัก) */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '110px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: 800, color: '#16a34a' }}>ความมั่นใจ {wordEvent.confidence}%</span>
-                          <div style={{ height: '6px', borderRadius: '9999px', backgroundColor: '#e2e8f0', overflow: 'hidden' }}>
-                            <div style={{ width: `${wordEvent.confidence}%`, height: '100%', borderRadius: '9999px', background: 'linear-gradient(90deg, #22c55e, #16a34a)', transition: 'width 0.4s ease' }} />
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: '15px', fontWeight: 700, color: '#94a3b8', lineHeight: '36px' }}>ทำท่าภาษามือหน้ากล้อง</span>
-                    )
-                  ) : null
-                }
-              ].map((half, i) => (
-                <React.Fragment key={half.label}>
-                  {i > 0 && <div style={{ width: '1px', background: 'linear-gradient(180deg, transparent, #dce8f7 20%, #dce8f7 80%, transparent)', flexShrink: 0 }} />}
-                  <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', gap: '18px', minWidth: 0 }}>
-                    <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: BLUE_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 20px -10px rgba(22,98,196,0.7)', flexShrink: 0 }}>
-                      <half.icon style={{ width: '28px', height: '28px', color: '#ffffff' }} />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
-                      <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#64748b' }}>{half.label}</span>
-                      {half.content ?? <span style={{ fontSize: '15px', fontWeight: 700, color: '#94a3b8', lineHeight: '36px' }}>กด START เพื่อเริ่มทบทวน</span>}
-                    </div>
-                  </div>
-                </React.Fragment>
-              ))}
-            </div>
-            ) : (
-            // SYNTAX BOARD (กลาง/ยาก): โจทย์ภาษาไทย (ซ้าย) / ท่าที่ทำได้ตามลำดับภาษามือ (ขวา)
-            <div style={{ ...homeCardStyle, height: '116px', display: 'flex', alignItems: 'stretch', flexShrink: 0 }}>
-              <Hand style={{ ...homeWatermarkStyle, width: '130px', height: '130px', right: '-20px', top: '-18px' }} />
-
-              {/* ฝั่งซ้าย: โจทย์ */}
-              <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '14px 18px', minWidth: 0 }}>
-                <BoxHeader icon={Flag} title="ไวยากรณ์ภาษาไทย" />
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  {isTimerRunning ? (
-                    (
-                      currentQ.thaiGrammar.map((item, idx) => (
-                        <React.Fragment key={idx}>
-                          {idx > 0 && <ChevronRight style={{ width: '14px', height: '14px', color: '#94a3b8' }} />}
-                          {/* สีประจำคำ + เลขลำดับที่ต้องทำในภาษามือ */}
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '17px', fontWeight: 800, color: item.color, backgroundColor: `${item.color}14`, border: `1px solid ${item.color}33`, padding: '3px 10px 3px 12px', borderRadius: '10px' }}>
-                            {item.word}
-                            <span style={{ width: '18px', height: '18px', borderRadius: '50%', backgroundColor: item.color, color: '#ffffff', fontSize: '11px', fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                              {getSignOrderIndex(currentQ, item.word)}
-                            </span>
-                          </span>
-                        </React.Fragment>
-                      ))
-                    )
-                  ) : (
-                    <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: 700 }}>กด START เพื่อเริ่มทบทวน</span>
-                  )}
-                </div>
-              </div>
-
-              <div style={{ width: '1px', background: 'linear-gradient(180deg, transparent, #dce8f7 20%, #dce8f7 80%, transparent)', flexShrink: 0 }} />
-
-              {/* ฝั่งขวา: ท่าที่ตรวจจับได้ตามลำดับภาษามือ */}
-              <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '14px 18px', minWidth: 0 }}>
-                <BoxHeader icon={Hand} title="ไวยากรณ์ภาษามือไทย" />
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                  {isTimerRunning ? (
-                    (
-                      // ช่องตามจำนวนคำของโจทย์: ล็อคแล้ว = น้ำเงินทึบ, ช่องที่กำลังรอ = คำที่ AI เห็นล่าสุด
-                      // (กรอบส้ม ไม่ว่าจะถูกหรือผิด ให้เห็นว่าระบบกำลังอ่านอะไร), ยังไม่ถึง = ช่องประ
-                      currentQ.signGrammar.map((_, idx) => {
-                        const isLocked = idx < lockedWords.length;
-                        const isLiveSlot = idx === lockedWords.length;
-                        const liveWord = isLiveSlot ? wordEvent?.word : null;
-                        const display = isLocked ? lockedWords[idx] : liveWord;
-                        return (
-                          <React.Fragment key={idx}>
-                            {idx > 0 && <ChevronRight style={{ width: '14px', height: '14px', color: '#94a3b8' }} />}
-                            {display ? (
-                              <span style={{ fontSize: '17px', fontWeight: 800, padding: '3px 12px', borderRadius: '10px', color: isLocked ? '#ffffff' : '#c2410c', background: isLocked ? BLUE_GRADIENT : '#fff7ed', border: isLocked ? '1px solid transparent' : '1px solid #fdba74' }}>
-                                {display}
-                              </span>
-                            ) : (
-                              <span style={{ minWidth: '44px', textAlign: 'center', fontSize: '15px', fontWeight: 800, padding: '3px 10px', borderRadius: '10px', color: isLiveSlot ? '#1662c4' : '#cbd5e1', border: `1.5px dashed ${isLiveSlot ? '#93c5fd' : '#dbe3ee'}` }}>
-                                {idx + 1}
-                              </span>
-                            )}
-                          </React.Fragment>
-                        );
-                      })
-                    )
-                  ) : (
-                    <span style={{ color: '#94a3b8', fontSize: '15px', fontWeight: 700 }}>กด START เพื่อเริ่มทบทวน</span>
-                  )}
-                </div>
-              </div>
-            </div>
-            )}
+            {syntaxBoard}
 
             {/* WEBCAM DISPLAY */}
             {gameCameraBox}
-
           </div>
 
-          {/* ฝั่งขวา: แผงควบคุม + ปุ่ม START — บนแท็บเล็ต (iPad แนวนอน) สลับไปใช้แผงควบคุมแบบย่อ
-              (การ์ดสถิติเล็ก + ปุ่มไอคอน เหมือนโหมดมือถือ) แทน 5 กล่องเต็มของ desktop เพราะสูงจอไม่พอ
-              ให้ 5 กล่องแบบเต็มพอดีเป๊ะ แต่ยังคงอยู่ฝั่งขวาเป็นคอลัมน์แคบเหมือนเดิม ไม่ใช่สแต็กเต็มความกว้าง
-              แบบมือถือ */}
-          {isTabletView ? (
-            // ย้อนกลับไปใช้ดีไซน์แบบย่อ (เวลา/คะแนน + การ์ดสถานะ+START + แถบไอคอนกล้อง) ตามที่ผู้ใช้
-            // ยืนยันไว้ก่อนหน้านี้ เปลี่ยนแค่ลำดับในการ์ดรวม: "สถานะการตรวจจับ" ขึ้นก่อน แล้วปุ่ม START
-            // วงกลมอยู่ด้านล่าง (สลับจากเดิมที่ START อยู่บน)
-            <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: '16px', height: '100%', flexShrink: 0 }}>
-              {/* สูง 116px + gap 16px เท่ากับ "กระดานโจทย์" ฝั่งซ้ายเป๊ะ เพื่อให้กล่องสถานะการตรวจจับ
-                  ที่ตามมาเริ่มตรงกับขอบบนของกล่องกล้องพอดี (ถ้าใช้ flex:1 ที่นี่เหมือนกล่องอื่น ความสูง
-                  จะไม่เท่ากับฝั่งซ้ายที่ fix ไว้ 116px ทำให้ขอบเริ่มเหลื่อมกัน) */}
-              <div style={{ height: '116px', flexShrink: 0, display: 'flex', gap: '8px' }}>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '14px', padding: '8px', textAlign: 'center', boxShadow: '0 4px 12px -8px rgba(13,71,161,0.18)' }}>
-                  <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#94a3b8' }}>เวลา</div>
-                  <div style={{ fontSize: '17px', fontWeight: 800, color: timeLeft <= 10 ? '#ef4444' : '#1e293b' }}>{timeLeft}s</div>
-                </div>
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '14px', padding: '8px', textAlign: 'center', boxShadow: '0 4px 12px -8px rgba(13,71,161,0.18)' }}>
-                  <div style={{ fontSize: '9.5px', fontWeight: 700, color: '#94a3b8' }}>คะแนน</div>
-                  <div style={{ fontSize: '17px', fontWeight: 800, color: '#1e293b' }}>{score}</div>
-                </div>
-              </div>
-
-              {/* กล่องสถานะการตรวจจับ (แบบเดียวกับหน้าหลัก) */}
-              <DetectionStatusBox status={detectionStatus} />
-
-              {/* กล่องปุ่ม START วงกลม (แยกกล่องต่างหาก) */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px', backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '14px', padding: '8px', boxShadow: '0 4px 12px -8px rgba(13,71,161,0.18)' }}>
-                <button
-                  onClick={handlePressStart}
-                  disabled={isTimerRunning}
-                  style={{
-                    width: '52px',
-                    height: '52px',
-                    borderRadius: '50%',
-                    background: isTimerRunning ? '#e2e8f0' : 'linear-gradient(135deg, #0d47a1, #1662c4)',
-                    border: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: isTimerRunning ? 'not-allowed' : 'pointer',
-                    boxShadow: isTimerRunning ? 'none' : '0 6px 18px rgba(13, 71, 161, 0.45)',
-                    opacity: isTimerRunning ? 0.6 : 1
-                  }}
-                >
-                  <Play style={{ width: '24px', height: '24px', color: isTimerRunning ? '#94a3b8' : '#ffffff', marginLeft: '3px', fill: isTimerRunning ? '#94a3b8' : '#ffffff' }} />
-                </button>
-                <span style={{ fontSize: '11px', fontWeight: 'bold', color: isTimerRunning ? '#94a3b8' : '#0d47a1' }}>
-                  {isTimerRunning ? 'กำลังเล่น' : 'START'}
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                <MobileControlButton
-                  icon={Camera}
-                  label={isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
-                  active
-                  variant={isCameraOn ? 'default' : 'danger'}
-                  onClick={toggleCamera}
-                />
-                <MobileControlButton
-                  icon={RefreshCw}
-                  label="สลับกล้อง"
-                  disabled={!isCameraOn}
-                  onClick={switchCamera}
-                />
-                <MobileControlButton
-                  icon={CloudFog}
-                  label="เบลอพื้นหลัง"
-                  active={isBlurBg}
-                  disabled={!isCameraOn}
-                  onClick={() => setIsBlurBg((v) => !v)}
-                />
-                <MobileControlButton
-                  icon={Bone}
-                  label="แสดงโครงกระดูก"
-                  active={isShowSkeleton}
-                  disabled={!isCameraOn}
-                  onClick={() => setIsShowSkeleton((v) => !v)}
-                />
-              </div>
-            </div>
-          ) : (
-          <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: isShortView ? '12px' : '16px', height: '100%', flexShrink: 0 }}>
+          {/* ฝั่งขวา: 5 กล่องแบบ PC — แท็บเล็ตแนวนอน (iPad) สูงไม่พอให้กล่องขนาดเต็ม จึงใช้ขนาดย่อแบบจอเตี้ย */}
+          <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: compactColumn ? '12px' : '16px', height: '100%', flexShrink: 0 }}>
             <style>{GAME_BOX_STYLES}</style>
-
-            {/* BOX 1: ปุ่ม START — สูง 116px เท่ากระดานโจทย์ฝั่งซ้าย ขอบบนล่างจะได้ตรงกัน */}
-            <div style={{ ...homeCardStyle, height: '116px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-              <Play style={{ ...homeWatermarkStyle, width: '84px', height: '84px', right: '-14px', top: '-14px' }} />
-              <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-                <button
-                  onClick={handlePressStart}
-                  disabled={isTimerRunning}
-                  className={isTimerRunning ? undefined : 'sb-start-btn'}
-                  style={{
-                    width: '60px',
-                    height: '60px',
-                    borderRadius: '50%',
-                    background: isTimerRunning ? '#e2e8f0' : BLUE_GRADIENT,
-                    border: 'none',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: isTimerRunning ? 'not-allowed' : 'pointer',
-                    boxShadow: isTimerRunning ? 'none' : '0 8px 18px -6px rgba(22,98,196,0.65)',
-                    flexShrink: 0
-                  }}
-                >
-                  <Play style={{ width: '28px', height: '28px', color: isTimerRunning ? '#94a3b8' : '#ffffff', marginLeft: '4px', fill: isTimerRunning ? '#94a3b8' : '#ffffff' }} />
-                </button>
-                <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-                  <span style={{ fontSize: '18px', fontWeight: 800, color: isTimerRunning ? '#94a3b8' : '#0d47a1' }}>{isTimerRunning ? 'กำลังฝึก' : 'START'}</span>
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8' }}>{isTimerRunning ? 'ทำท่าหน้ากล้องได้เลย' : 'กดเพื่อเริ่มจับเวลา'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* BOX 2: สถานะการตรวจจับ (แบบเดียวกับหน้าหลัก) */}
-            <DetectionStatusBox status={detectionStatus} height={isShortView ? 60 : 84} />
-
-            {/* BOX 3: เวลาถอยหลัง — วงแหวนนับถอยหลังตามเวลาที่เหลือ (แดงเมื่อเหลือ ≤ 10 วินาที) */}
-            <div style={{ ...homeCardStyle, padding: isShortView ? '10px 14px' : '14px', display: 'flex', flexDirection: 'column', gap: isShortView ? '4px' : '6px', flexShrink: 0 }}>
-              <Timer style={{ ...homeWatermarkStyle, width: '84px', height: '84px', right: '-14px', top: '-14px' }} />
-              <BoxHeader icon={Timer} title="เวลาถอยหลัง" size={isShortView ? 'sm' : 'md'} />
-              {(() => {
-                const ring = isShortView ? 60 : 72;
-                const radius = ring / 2 - 5;
-                const circumference = 2 * Math.PI * radius;
-                const ratio = Math.max(0, Math.min(1, timeLeft / difficultyMeta[difficulty].timeLimit));
-                const danger = timeLeft <= 10;
-                return (
-                  <div style={{ position: 'relative', alignSelf: 'center', width: `${ring}px`, height: `${ring}px` }}>
-                    <svg width={ring} height={ring} style={{ transform: 'rotate(-90deg)' }}>
-                      <circle cx={ring / 2} cy={ring / 2} r={radius} fill="none" stroke="#e8f1fd" strokeWidth="6" />
-                      <circle
-                        cx={ring / 2}
-                        cy={ring / 2}
-                        r={radius}
-                        fill="none"
-                        stroke={danger ? '#ef4444' : '#1662c4'}
-                        strokeWidth="6"
-                        strokeLinecap="round"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={-circumference * (1 - ratio)}
-                        style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s ease' }}
-                      />
-                    </svg>
-                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                      <span style={{ fontSize: isShortView ? '20px' : '24px', fontWeight: 800, color: danger ? '#ef4444' : '#1e293b', lineHeight: 1 }}>{timeLeft}</span>
-                      <span style={{ fontSize: '9.5px', fontWeight: 600, color: '#64748b', marginTop: '2px' }}>วินาที</span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* BOX 4: คะแนนสะสม */}
-            <div style={{ ...homeCardStyle, flex: 1, minHeight: 'min-content', padding: isShortView ? '10px 14px' : '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <Award style={{ ...homeWatermarkStyle, width: '96px', height: '96px', right: '-18px', top: '-16px' }} />
-              <BoxHeader icon={Award} title="คะแนนสะสม" size={isShortView ? 'sm' : 'md'} />
-              <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
-                <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
-                  <span key={score} className="sb-score-pop" style={{ fontSize: isShortView ? '32px' : '40px', fontWeight: 800, color: '#1e293b' }}>{score}</span>
-                  {score > 0 && (
-                    <span key={`gain-${score}`} className="sb-score-gain" style={{ position: 'absolute', left: '100%', top: '-2px', marginLeft: '2px', fontSize: '17px', fontWeight: 800, color: '#16a34a', whiteSpace: 'nowrap', pointerEvents: 'none' }}>
-                      +{POINTS_PER_CORRECT}
-                    </span>
-                  )}
-                  <span style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8' }}>คะแนน</span>
-                </div>
-              </div>
-            </div>
-
-            {/* BOX 5: กล่องควบคุมกล้อง (component เดียวกับหน้าหลัก) */}
-            <CameraControlBox
-              isCameraOn={isCameraOn}
-              onToggleCamera={toggleCamera}
-              onSwitchCamera={switchCamera}
-              isBlurBg={isBlurBg}
-              onToggleBlur={() => setIsBlurBg(!isBlurBg)}
-              isShowSkeleton={isShowSkeleton}
-              onToggleSkeleton={() => setIsShowSkeleton(!isShowSkeleton)}
-              compact={isShortView}
-            />
+            {startBox}
+            <DetectionStatusBox status={detectionStatus} height={compactColumn ? 60 : 84} />
+            {timerBox}
+            {scoreBox}
+            {cameraControlBox}
           </div>
-          )}
 
         </div>
       ))}

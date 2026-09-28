@@ -34,3 +34,13 @@ export function useIsShortView(maxHeight = 760): boolean {
 
   return isShort;
 }
+
+// แท็บเล็ตแนวตั้ง (เช่น iPad 820x1180): จอแคบกว่า 1024px จึงใช้ layout มือถือ แต่กว้างและสูงพอจะวางกล่องชุดเดียวกับ PC
+// (กล้องตรงกลาง กล่องสถานะ/ปุ่มควบคุมเรียงใต้กล้อง) ให้เห็นครบในจอเดียว — มือถือ (แคบ ≤700px)
+// และมือถือแนวนอน (เตี้ย ≤700px) ยังใช้ layout มือถือเดิม
+export function useIsTabletPortrait(): boolean {
+  const isMobileView = useIsMobileView();
+  const isNarrow = useIsMobileView(700);
+  const isShort = useIsShortView(700);
+  return isMobileView && !isNarrow && !isShort;
+}

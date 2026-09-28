@@ -32,8 +32,9 @@ export const WordDetailPage: React.FC<WordDetailPageProps> = ({
   onOpenSentence,
 }) => {
   const isMobileView = useIsMobileView();
-  // จอแท็บเล็ต (เช่น iPad แนวนอน) ไม่มีที่พอวางวิดีโอกับรายละเอียดคู่กัน จึงเรียงลงมาแบบมือถือ
-  const isCompactView = useIsMobileView(1366);
+  // วิดีโอกับรายละเอียดเรียงลงมาเฉพาะจอที่ใช้ layout มือถือ (≤1024px) — แท็บเล็ตแนวนอนวางคู่กันแบบ PC
+  const isCompactView = isMobileView;
+  const isTabletView = useIsMobileView(1366);
 
   // ดึงไฟล์วิดีโอใบแรกในโฟลเดอร์คำศัพท์ — ใช้ path แบบ relative (ไม่ใส่ "/" นำหน้า) ให้สอดคล้องกับ
   // base: './' ใน vite.config.ts เพราะ path ที่ขึ้นต้นด้วย "/" จะอ้างอิงจาก domain root เสมอ ซึ่งพัง
@@ -65,6 +66,7 @@ export const WordDetailPage: React.FC<WordDetailPageProps> = ({
       <VideoDetailLayout
         isMobileView={isMobileView}
         isCompactView={isCompactView}
+        fillHeight={isTabletView}
         video={<VideoBox src={videoSrc} label={categoryName} isCompactView={isCompactView} />}
       >
         <div>

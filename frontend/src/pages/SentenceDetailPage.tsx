@@ -45,7 +45,9 @@ const WordOrder: React.FC<{ words: SentenceWord[]; solid?: boolean }> = ({ words
 
 export const SentenceDetailPage: React.FC<SentenceDetailPageProps> = ({ length, sentenceId, onBack }) => {
   const isMobileView = useIsMobileView();
-  const isCompactView = useIsMobileView(1366);
+  // วิดีโอกับรายละเอียดเรียงลงมาเฉพาะจอที่ใช้ layout มือถือ (≤1024px) — แท็บเล็ตแนวนอนวางคู่กันแบบ PC
+  const isCompactView = isMobileView;
+  const isTabletView = useIsMobileView(1366);
 
   const sentence = SENTENCES[length].find((s) => s.id === sentenceId);
   if (!sentence) return null;
@@ -66,6 +68,7 @@ export const SentenceDetailPage: React.FC<SentenceDetailPageProps> = ({ length, 
       <VideoDetailLayout
         isMobileView={isMobileView}
         isCompactView={isCompactView}
+        fillHeight={isTabletView}
         video={<VideoBox src={sentenceVideoSrc(length, sentence)} label={`ประโยค${sentence.type}`} isCompactView={isCompactView} />}
       >
         <div>

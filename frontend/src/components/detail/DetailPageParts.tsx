@@ -179,20 +179,24 @@ export const VideoBox: React.FC<{ src: string; label: string; isCompactView: boo
 // ความสูงของแถวมาจากวิดีโอ (16:9) อย่างเดียว ส่วนกล่องรายละเอียดวางแบบ absolute เต็มช่องของมัน
 // ถ้าเนื้อหายาวกว่าก็เลื่อนในกล่องเอง ไม่ดันแถวให้สูงกว่าวิดีโอ
 // จอเล็ก: เรียงลงมาตามปกติ ให้หน้า (ไม่ใช่กล่องนี้) เป็นตัวเลื่อน
-export const VideoDetailLayout: React.FC<{ video: React.ReactNode; isMobileView: boolean; isCompactView: boolean; children: React.ReactNode }> = ({
+// fillHeight (แท็บเล็ตแนวนอน): วิดีโอเตี้ยเพราะคอลัมน์แคบ ถ้ากล่องรายละเอียดสูงเท่าวิดีโอจะเหลือที่ว่างใต้ทั้งคู่
+// จึงให้แถวยืดเต็มความสูงที่เหลือของหน้า วิดีโอชิดบน กล่องรายละเอียดสูงเต็มแถว
+export const VideoDetailLayout: React.FC<{ video: React.ReactNode; isMobileView: boolean; isCompactView: boolean; fillHeight?: boolean; children: React.ReactNode }> = ({
   video,
   isMobileView,
   isCompactView,
+  fillHeight = false,
   children
 }) => {
   const panelStyle: React.CSSProperties = {
     backgroundColor: '#ffffff',
     border: '1px solid #e3ecf7',
     borderRadius: '24px',
-    padding: isMobileView ? '16px' : '20px 22px',
+    // แท็บเล็ตแนวนอนสูงจำกัด: ลดช่องไฟให้รายละเอียดประโยคพอดีกล่องโดยไม่ต้องเลื่อน
+    padding: isMobileView ? '16px' : fillHeight ? '16px 20px' : '20px 22px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: fillHeight && !isCompactView ? '10px' : '16px',
     boxShadow: '0 10px 28px -14px rgba(13,71,161,0.16)',
     boxSizing: 'border-box'
   };
@@ -203,7 +207,8 @@ export const VideoDetailLayout: React.FC<{ video: React.ReactNode; isMobileView:
         display: 'grid',
         gridTemplateColumns: isCompactView ? '1fr' : 'minmax(0, 1.5fr) minmax(340px, 1fr)',
         gap: isMobileView ? '14px' : '20px',
-        alignItems: 'start'
+        alignItems: 'start',
+        ...(fillHeight && !isCompactView ? { flex: 1, minHeight: 0, gridTemplateRows: 'minmax(0, 1fr)' } : {})
       }}
     >
       {video}
