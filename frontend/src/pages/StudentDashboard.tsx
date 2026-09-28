@@ -33,7 +33,6 @@ import SentenceDetailPage from './SentenceDetailPage';
 import { SENTENCES, type SentenceLength } from '../data/sentences';
 import { wordsData } from '../data/words';
 import { resolveWsUrl } from '../services/wsConfig';
-import { applyNormalZoom } from '../services/cameraZoom';
 import { useIsMobileView, useIsShortView, useIsTabletPortrait, useIsTabletLandscape } from '../hooks/useIsMobileView';
 import { MobileControlButton } from '../components/common/MobileControlButton';
 import TooCloseWarning from '../components/webcam/TooCloseWarning';
@@ -146,7 +145,6 @@ export const StudentDashboard: React.FC = () => {
         audio: false
       });
       streamRef.current = stream;
-      await applyNormalZoom(stream);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {

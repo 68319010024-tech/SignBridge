@@ -19,7 +19,6 @@ import {
   Aperture
 } from 'lucide-react';
 import { resolveWsUrl } from '../services/wsConfig';
-import { applyNormalZoom } from '../services/cameraZoom';
 import { useIsMobileView, useIsShortView, useIsTabletPortrait, useIsTabletLandscape } from '../hooks/useIsMobileView';
 import { PageBadge } from '../components/common/PageBadge';
 import { MobileControlButton } from '../components/common/MobileControlButton';
@@ -378,7 +377,6 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
         audio: false
       });
       streamRef.current = stream;
-      await applyNormalZoom(stream);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
