@@ -9,7 +9,9 @@ export const MobileControlButton: React.FC<{
   disabled?: boolean;
   variant?: 'default' | 'danger' | 'success';
   onClick: () => void;
-}> = ({ icon: Icon, label, active = false, disabled = false, variant = 'default', onClick }) => {
+  // วางหลายปุ่มในแถวเดียว (หรือในตาราง) ได้ — ไม่บังคับความกว้างขั้นต่ำ 92px ที่ทำให้ปุ่มตกแถว
+  slim?: boolean;
+}> = ({ icon: Icon, label, active = false, disabled = false, variant = 'default', onClick, slim = false }) => {
   const activeBackground =
     variant === 'danger'
       ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
@@ -22,8 +24,8 @@ export const MobileControlButton: React.FC<{
       onClick={onClick}
       disabled={disabled}
       style={{
-        flex: '1 1 30%',
-        minWidth: '92px',
+        flex: slim ? '1 1 0' : '1 1 30%',
+        minWidth: slim ? 0 : '92px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

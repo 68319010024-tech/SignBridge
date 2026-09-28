@@ -33,7 +33,7 @@ import SentenceDetailPage from './SentenceDetailPage';
 import { SENTENCES, type SentenceLength } from '../data/sentences';
 import { wordsData } from '../data/words';
 import { resolveWsUrl } from '../services/wsConfig';
-import { useIsMobileView, useIsShortView, useIsTabletPortrait, useIsTabletLandscape } from '../hooks/useIsMobileView';
+import { useIsMobileView, useIsShortView, useIsTabletPortrait, useIsTabletLandscape, useIsPhoneLandscape } from '../hooks/useIsMobileView';
 import { MobileControlButton } from '../components/common/MobileControlButton';
 import TooCloseWarning from '../components/webcam/TooCloseWarning';
 import { BoxHeader, homeCardStyle, homeWatermarkStyle, homeButtonStyle, homeButtonIconStyle, homeGhostStyle, homeGhostIconStyle } from '../components/common/BoxHeader';
@@ -109,6 +109,8 @@ export const StudentDashboard: React.FC = () => {
   const isTabletPortrait = useIsTabletPortrait();
   // iPad แนวนอน: Safari มีแถบแท็บ/ที่อยู่ เหลือพื้นที่สูงราว 690px — ซ่อนหัวข้อกล่องสถานะให้คอลัมน์ขวาพอดีขอบล่างกล้อง
   const isTabletLandscape = useIsTabletLandscape();
+  // มือถือแนวนอน: กล้องซ้าย การ์ดสถานะ + ปุ่มควบคุมเรียงในคอลัมน์ขวา ให้ทั้งหมดพอดีจอ
+  const isPhoneLandscape = useIsPhoneLandscape();
   // กล่องประโยคล่าสุดโผล่ตอนอัดประโยค — จอเตี้ยต้องบีบปุ่มในกล่องตรวจจับประโยคให้เหลือแถวเดียว
   const compactSentenceButtons = isShortView && isRecordingSentence;
   // iPad แนวนอน: ปุ่มในกล่องตรวจจับประโยคเรียงแถวเดียวเสมอ กล่องจะเตี้ยลง ให้ที่เหลือกับกล่องควบคุมกล้อง
@@ -842,6 +844,98 @@ export const StudentDashboard: React.FC = () => {
     />
   );
 
+  // มือถือ: การ์ดสถานะผลตรวจจับแบบย่อ
+  const mobileStatusCard = (
+    <div style={{ backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '18px', padding: '12px 14px', flexShrink: 0, boxShadow: '0 6px 16px -10px rgba(13,71,161,0.16)' }}>
+      {!isRecordingSentence ? (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8' }}>คำเดี่ยว (Single Word)</span>
+            {isCameraOn && previousWord && (
+              <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#94a3b8' }}>
+                ล่าสุด: <span style={{ color: '#64748b' }}>{previousWord}</span>
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '3px' }}>
+            {isCameraOn && singleWordResult ? (
+              <>
+                <span key={singleWordResult.id} className="sb-word-pop" style={{ fontSize: '22px', fontWeight: '800', color: '#0d47a1' }}>{singleWordResult.word}</span>
+                <span style={{ fontSize: '12.5px', fontWeight: 'bold', color: '#16a34a' }}>({singleWordResult.confidence}%)</span>
+              </>
+            ) : (
+              <span style={{ color: '#94a3b8', letterSpacing: '3px', fontSize: '15px', fontFamily: 'monospace' }}>--------</span>
+            )}
+          </div>
+        </>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Flag style={{ width: '12px', height: '12px', color: '#0d47a1', flexShrink: 0 }} />
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b', flexShrink: 0 }}>ไวยากรณ์ไทย:</span>
+            <span style={{ fontSize: '13px', fontWeight: 800, color: transformedWords.length > 0 ? '#0d47a1' : '#94a3b8' }}>
+              {transformedWords.length > 0 ? transformedWords.join(' - ') : '-'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Hand style={{ width: '12px', height: '12px', color: '#0d47a1', flexShrink: 0 }} />
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b', flexShrink: 0 }}>ไวยากรณ์มือ:</span>
+            <span style={{ fontSize: '13px', fontWeight: 800, color: recordedWords.length > 0 ? '#0d47a1' : '#94a3b8' }}>
+              {recordedWords.length > 0 ? recordedWords.join(' - ') : '-'}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // มือถือ: แถบไอคอนควบคุม แตะไอคอนเพื่อสั่งงานฟังก์ชันนั้นทันที (แทนการ์ดเต็มจอที่เบียดกันบนมือถือ)
+  const mobileControls = (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', flexShrink: 0 }}>
+      <MobileControlButton
+        icon={Camera}
+        label={isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
+        active
+        variant={isCameraOn ? 'default' : 'danger'}
+        onClick={toggleCamera}
+      />
+      <MobileControlButton
+        icon={RefreshCw}
+        label="สลับกล้อง"
+        disabled={!isCameraOn}
+        onClick={switchCamera}
+      />
+      <MobileControlButton
+        icon={isRecordingSentence ? StopCircle : PlayCircle}
+        label={isRecordingSentence ? 'แปลผลประโยค' : 'เริ่มอัดประโยค'}
+        active
+        variant={isRecordingSentence ? 'danger' : 'success'}
+        disabled={!isCameraOn}
+        onClick={toggleSentenceRecording}
+      />
+      <MobileControlButton
+        icon={RotateCcw}
+        label="ล้างประโยค"
+        disabled={!isCameraOn}
+        onClick={clearSentence}
+      />
+      <MobileControlButton
+        icon={CloudFog}
+        label="เบลอพื้นหลัง"
+        active={isBlurBg}
+        disabled={!isCameraOn}
+        onClick={() => setIsBlurBg((v) => !v)}
+      />
+      <MobileControlButton
+        icon={Bone}
+        label="แสดงโครงกระดูก"
+        active={isShowSkeleton}
+        disabled={!isCameraOn}
+        onClick={() => setIsShowSkeleton((v) => !v)}
+      />
+    </div>
+  );
+
   return (
     // ใช้ 100dvh แทน 100vh: บน iPad/iPhone Safari, 100vh คำนวณจากความสูงจอสูงสุด (เหมือน address
     // bar ถูกซ่อนอยู่เสมอ) ซึ่งสูงกว่าพื้นที่แสดงผลจริงเวลามี address bar/toolbar โผล่มา ทำให้ layout
@@ -1092,104 +1186,20 @@ export const StudentDashboard: React.FC = () => {
 
           {/* 1. หน้าหลัก */}
           {activeTab === 'home' && (isMobileView && !isTabletPortrait ? (
-            // ไม่ใส่ flex:1/minHeight:0 ที่นี่โดยตั้งใจ: ให้ความสูงคำนวณจาก content จริง แล้วปล่อยให้
-            // <main> ด้านบน (ซึ่งตั้ง overflow:auto ไว้แล้ว) เป็นตัวเลื่อนเพียงจุดเดียว ถ้าตั้ง flex:1
-            // + minHeight:0 ตรงนี้ด้วย จะกลายเป็นบีบอัด content ให้พอดีกรอบแทนการล้นแล้วเลื่อนดูได้
-            <div className="sb-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-              {/* กล่องสถานะผลตรวจจับ (ย่อ) */}
-              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '18px', padding: '12px 14px', flexShrink: 0, boxShadow: '0 6px 16px -10px rgba(13,71,161,0.16)' }}>
-                {!isRecordingSentence ? (
-                  <>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8' }}>คำเดี่ยว (Single Word)</span>
-                      {isCameraOn && previousWord && (
-                        <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#94a3b8' }}>
-                          ล่าสุด: <span style={{ color: '#64748b' }}>{previousWord}</span>
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '3px' }}>
-                      {isCameraOn && singleWordResult ? (
-                        <>
-                          <span key={singleWordResult.id} className="sb-word-pop" style={{ fontSize: '22px', fontWeight: '800', color: '#0d47a1' }}>{singleWordResult.word}</span>
-                          <span style={{ fontSize: '12.5px', fontWeight: 'bold', color: '#16a34a' }}>({singleWordResult.confidence}%)</span>
-                        </>
-                      ) : (
-                        <span style={{ color: '#94a3b8', letterSpacing: '3px', fontSize: '15px', fontFamily: 'monospace' }}>--------</span>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Flag style={{ width: '12px', height: '12px', color: '#0d47a1', flexShrink: 0 }} />
-                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b', flexShrink: 0 }}>ไวยากรณ์ไทย:</span>
-                      <span style={{ fontSize: '13px', fontWeight: 800, color: transformedWords.length > 0 ? '#0d47a1' : '#94a3b8' }}>
-                        {transformedWords.length > 0 ? transformedWords.join(' - ') : '-'}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Hand style={{ width: '12px', height: '12px', color: '#0d47a1', flexShrink: 0 }} />
-                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b', flexShrink: 0 }}>ไวยากรณ์มือ:</span>
-                      <span style={{ fontSize: '13px', fontWeight: 800, color: recordedWords.length > 0 ? '#0d47a1' : '#94a3b8' }}>
-                        {recordedWords.length > 0 ? recordedWords.join(' - ') : '-'}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* กล่องแสดงภาพกล้อง: ใช้ aspect-ratio แทน flex:1 เพื่อให้ความสูงรวมของหน้าคำนวณได้แน่นอน
-                  (ไม่งั้นทั้งกล่องนี้และ toolbar ด้านล่างจะแย่งพื้นที่กันจนบางส่วนหลุดจอ) */}
-              <div style={{ width: '100%', aspectRatio: '3 / 4', display: 'flex', flexShrink: 0 }}>
+            // มือถือ: พอดีจอเดียวไม่ต้องเลื่อน — การ์ดสถานะกับปุ่มขนาดคงที่ กล้องยืดเต็มพื้นที่ที่เหลือ (ไม่ล็อกสัดส่วน 3:4)
+            // เพราะจอที่มองเห็นจริงเตี้ยกว่าความละเอียดจอมาก (แถบของ Safari/Chrome) — <main> ยังเลื่อนได้เป็นทางสำรอง
+            // แนวนอน: กล้องซ้าย การ์ดสถานะ + ปุ่มในคอลัมน์ขวา
+            <div className="sb-fade-in" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: isPhoneLandscape ? 'row' : 'column', gap: '10px' }}>
+              {!isPhoneLandscape && mobileStatusCard}
+              <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex' }}>
                 {cameraBox}
               </div>
-
-              {/* แถบไอคอนควบคุม: แตะไอคอนเพื่อสั่งงานฟังก์ชันนั้นทันที (แทนการ์ดเต็มจอที่เบียดกันบนมือถือ) */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', flexShrink: 0 }}>
-                <MobileControlButton
-                  icon={Camera}
-                  label={isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
-                  active
-                  variant={isCameraOn ? 'default' : 'danger'}
-                  onClick={toggleCamera}
-                />
-                <MobileControlButton
-                  icon={RefreshCw}
-                  label="สลับกล้อง"
-                  disabled={!isCameraOn}
-                  onClick={switchCamera}
-                />
-                <MobileControlButton
-                  icon={isRecordingSentence ? StopCircle : PlayCircle}
-                  label={isRecordingSentence ? 'แปลผลประโยค' : 'เริ่มอัดประโยค'}
-                  active
-                  variant={isRecordingSentence ? 'danger' : 'success'}
-                  disabled={!isCameraOn}
-                  onClick={toggleSentenceRecording}
-                />
-                <MobileControlButton
-                  icon={RotateCcw}
-                  label="ล้างประโยค"
-                  disabled={!isCameraOn}
-                  onClick={clearSentence}
-                />
-                <MobileControlButton
-                  icon={CloudFog}
-                  label="เบลอพื้นหลัง"
-                  active={isBlurBg}
-                  disabled={!isCameraOn}
-                  onClick={() => setIsBlurBg((v) => !v)}
-                />
-                <MobileControlButton
-                  icon={Bone}
-                  label="แสดงโครงกระดูก"
-                  active={isShowSkeleton}
-                  disabled={!isCameraOn}
-                  onClick={() => setIsShowSkeleton((v) => !v)}
-                />
-              </div>
+              {isPhoneLandscape ? (
+                <div style={{ width: '300px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto' }}>
+                  {mobileStatusCard}
+                  {mobileControls}
+                </div>
+              ) : mobileControls}
             </div>
           ) : isTabletPortrait ? (
             // แท็บเล็ตแนวตั้ง: กล่องชุดเดียวกับ PC — แถวบน (ผลตรวจจับ | คำล่าสุด) เหมือน PC, กล้องยืดเต็มที่ว่าง,
