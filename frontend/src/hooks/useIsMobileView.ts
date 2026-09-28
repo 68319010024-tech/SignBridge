@@ -45,6 +45,26 @@ export function useIsTabletPortrait(): boolean {
   return isMobileView && !isNarrow && !isShort;
 }
 
+// มือถือแนวนอน (เช่น 844x390): จอ ≤1024px ที่เตี้ยไม่เกิน 700px และกว้างกว่าสูง — วางกล้องซ้าย กล่องเรียงในคอลัมน์ขวา
+// (ถ้าสแต็กแนวตั้งแบบแนวตั้ง กล้องจะสูงเกินจอหลายเท่า)
+export function useIsPhoneLandscape(): boolean {
+  const isMobileView = useIsMobileView();
+  const isShort = useIsShortView(700);
+  const [isLandscape, setIsLandscape] = useState<boolean>(
+    () => typeof window !== 'undefined' && window.matchMedia('(orientation: landscape)').matches
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia('(orientation: landscape)');
+    const handleChange = (e: MediaQueryList | MediaQueryListEvent) => setIsLandscape(e.matches);
+    handleChange(mql);
+    mql.addEventListener('change', handleChange);
+    return () => mql.removeEventListener('change', handleChange);
+  }, []);
+
+  return isMobileView && isShort && isLandscape;
+}
+
 // แท็บเล็ตแนวนอน (เช่น iPad 1180x820): กว้างเกิน 1024px จึงใช้ layout แบบ PC แต่เป็นจอสัมผัส
 // ใช้ (pointer: coarse) แยกออกจากโน้ตบุ๊กขนาดเดียวกัน (1366x768, 1280x720) ที่ใช้เมาส์
 // จะได้ปรับเฉพาะ iPad โดยไม่กระทบกล่องบน PC ที่ลงตัวแล้ว

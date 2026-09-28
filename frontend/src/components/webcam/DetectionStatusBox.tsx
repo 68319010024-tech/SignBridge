@@ -31,7 +31,7 @@ const LOOK: Record<DetectionStatus['kind'], { icon: IconType; color: string; bg:
   'ready': { icon: Hand, color: '#0d47a1', bg: '#e8f1fd', text: 'พร้อม รอภาษามือ' },
 };
 
-// ข้อความ/สี/ไอคอนของสถานะ — ใช้ร่วมกับช่องสถานะแบบย่อบนมือถือด้วย
+// ข้อความ/สี/ไอคอนของสถานะ
 export const describeStatus = (status: DetectionStatus) => {
   const look = LOOK[status.kind];
   return { ...look, text: status.kind === 'detected' ? `ตรวจจับได้: ${status.word}` : look.text };
