@@ -19,7 +19,8 @@ import {
   Aperture
 } from 'lucide-react';
 import { resolveWsUrl } from '../services/wsConfig';
-import { useIsMobileView, useIsShortView, useIsTabletPortrait } from '../hooks/useIsMobileView';
+import { applyNormalZoom } from '../services/cameraZoom';
+import { useIsMobileView, useIsShortView, useIsTabletPortrait, useIsTabletLandscape } from '../hooks/useIsMobileView';
 import { PageBadge } from '../components/common/PageBadge';
 import { MobileControlButton } from '../components/common/MobileControlButton';
 import TooCloseWarning from '../components/webcam/TooCloseWarning';
@@ -291,6 +292,8 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
   const isTightColumn = useIsShortView(740);
   // iPad แนวตั้ง: ใช้กล่องชุดเดียวกับ PC เรียงใต้กล้อง
   const isTabletPortrait = useIsTabletPortrait();
+  // iPad แนวนอน: ซ่อนหัวข้อกล่องสถานะ/เวลาถอยหลัง/คะแนนสะสม เหลือแต่ค่า ให้คอลัมน์ขวาพอดีขอบล่างกล้อง
+  const hideBoxHeaders = useIsTabletLandscape();
   const [gameState, setGameState] = useState<'select' | 'playing' | 'result'>('select');
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   
@@ -375,6 +378,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
         audio: false
       });
       streamRef.current = stream;
+      await applyNormalZoom(stream);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
@@ -1062,9 +1066,9 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
 
   // เวลาถอยหลัง — วงแหวนนับถอยหลังตามเวลาที่เหลือ (แดงเมื่อเหลือ ≤ 10 วินาที)
   const timerBox = (
-    <div style={{ ...homeCardStyle, padding: compactColumn ? '10px 14px' : '14px', display: 'flex', flexDirection: isTightColumn ? 'row' : 'column', alignItems: isTightColumn ? 'center' : undefined, justifyContent: isTightColumn ? 'space-between' : 'center', gap: compactColumn ? '4px' : '6px', flexShrink: 0 }}>
+    <div style={{ ...homeCardStyle, padding: compactColumn ? '10px 14px' : '14px', display: 'flex', flexDirection: isTightColumn ? 'row' : 'column', alignItems: isTightColumn ? 'center' : undefined, justifyContent: isTightColumn && !hideBoxHeaders ? 'space-between' : 'center', gap: compactColumn ? '4px' : '6px', flexShrink: 0 }}>
       <Timer style={{ ...homeWatermarkStyle, width: '84px', height: '84px', right: '-14px', top: '-14px' }} />
-      <BoxHeader icon={Timer} title="เวลาถอยหลัง" size={compactColumn ? 'sm' : 'md'} />
+      {!hideBoxHeaders && <BoxHeader icon={Timer} title="เวลาถอยหลัง" size={compactColumn ? 'sm' : 'md'} />}
       {(() => {
         const ring = isTightColumn ? 52 : compactColumn ? 60 : 72;
         const radius = ring / 2 - 5;
@@ -1102,7 +1106,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
   const scoreBox = (
     <div style={{ ...homeCardStyle, flex: 1, minHeight: 'min-content', padding: compactColumn ? '10px 14px' : '14px', display: 'flex', flexDirection: isTightColumn ? 'row' : 'column', alignItems: isTightColumn ? 'center' : undefined, gap: '6px' }}>
       <Award style={{ ...homeWatermarkStyle, width: '96px', height: '96px', right: '-18px', top: '-16px' }} />
-      <BoxHeader icon={Award} title="คะแนนสะสม" size={compactColumn ? 'sm' : 'md'} />
+      {!hideBoxHeaders && <BoxHeader icon={Award} title="คะแนนสะสม" size={compactColumn ? 'sm' : 'md'} />}
       <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.1 }}>
           <span key={score} className="sb-score-pop" style={{ fontSize: isTightColumn ? '28px' : compactColumn ? '32px' : '40px', fontWeight: 800, color: '#1e293b' }}>{score}</span>
@@ -1448,10 +1452,10 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
           </div>
 
           {/* ฝั่งขวา: 5 กล่องแบบ PC — แท็บเล็ตแนวนอน (iPad) สูงไม่พอให้กล่องขนาดเต็ม จึงใช้ขนาดย่อแบบจอเตี้ย */}
-          <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: compactColumn ? '12px' : '16px', height: '100%', flexShrink: 0 }}>
+          <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: hideBoxHeaders ? '8px' : compactColumn ? '12px' : '16px', height: '100%', flexShrink: 0 }}>
             <style>{GAME_BOX_STYLES}</style>
             {startBox}
-            <DetectionStatusBox status={detectionStatus} height={compactColumn ? 60 : 84} />
+            <DetectionStatusBox status={detectionStatus} height={hideBoxHeaders ? 48 : compactColumn ? 60 : 84} hideHeader={hideBoxHeaders} />
             {timerBox}
             {scoreBox}
             {cameraControlBox}

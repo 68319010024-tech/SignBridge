@@ -33,7 +33,8 @@ import SentenceDetailPage from './SentenceDetailPage';
 import { SENTENCES, type SentenceLength } from '../data/sentences';
 import { wordsData } from '../data/words';
 import { resolveWsUrl } from '../services/wsConfig';
-import { useIsMobileView, useIsShortView, useIsTabletPortrait } from '../hooks/useIsMobileView';
+import { applyNormalZoom } from '../services/cameraZoom';
+import { useIsMobileView, useIsShortView, useIsTabletPortrait, useIsTabletLandscape } from '../hooks/useIsMobileView';
 import { MobileControlButton } from '../components/common/MobileControlButton';
 import TooCloseWarning from '../components/webcam/TooCloseWarning';
 import { BoxHeader, homeCardStyle, homeWatermarkStyle, homeButtonStyle, homeButtonIconStyle, homeGhostStyle, homeGhostIconStyle } from '../components/common/BoxHeader';
@@ -105,6 +106,8 @@ export const StudentDashboard: React.FC = () => {
   const isShortView = useIsShortView(800);
   // iPad แนวตั้ง: ใช้ sidebar แบบมือถือ แต่หน้าหลักวางกล่องชุดเดียวกับ PC
   const isTabletPortrait = useIsTabletPortrait();
+  // iPad แนวนอน: Safari มีแถบแท็บ/ที่อยู่ เหลือพื้นที่สูงราว 690px — ซ่อนหัวข้อกล่องสถานะให้คอลัมน์ขวาพอดีขอบล่างกล้อง
+  const isTabletLandscape = useIsTabletLandscape();
   // กล่องประโยคล่าสุดโผล่ตอนอัดประโยค — จอเตี้ยต้องบีบปุ่มในกล่องตรวจจับประโยคให้เหลือแถวเดียว
   const compactSentenceButtons = isShortView && isRecordingSentence;
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
@@ -141,6 +144,7 @@ export const StudentDashboard: React.FC = () => {
         audio: false
       });
       streamRef.current = stream;
+      await applyNormalZoom(stream);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
@@ -1201,13 +1205,13 @@ export const StudentDashboard: React.FC = () => {
               </div>
 
               {/* ฝั่งขวา */}
-              <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: isShortView ? '12px' : '16px', flexShrink: 0 }}>
+              <div style={{ width: '220px', display: 'flex', flexDirection: 'column', gap: isTabletLandscape ? '8px' : isShortView ? '12px' : '16px', flexShrink: 0 }}>
                 {lastWordBox}
                 {lastSentenceBox}
 
                 {/* กล่องสถานะการตรวจจับ — ความสูงคงที่ กล่องด้านล่างเป็น flex:1 จึงหดให้เอง
                     ขอบล่างของคอลัมน์ขวายังตรงกับขอบล่างกล้องพอดี */}
-                <DetectionStatusBox status={detectionStatus} height={isShortView ? 60 : 84} />
+                <DetectionStatusBox status={detectionStatus} height={isTabletLandscape ? 48 : isShortView ? 60 : 84} hideHeader={isTabletLandscape} />
                 {sentenceBox}
                 {cameraControlBox}
               </div>

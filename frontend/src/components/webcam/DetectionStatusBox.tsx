@@ -60,7 +60,8 @@ export const resolveDetectionStatus = (s: {
 };
 
 // height ไม่ระบุ = ยืดเต็มที่ว่าง (flex: 1) ใช้ในคอลัมน์แคบของแท็บเล็ต
-export const DetectionStatusBox: React.FC<{ status: DetectionStatus; height?: number }> = ({ status, height }) => {
+// hideHeader: ไม่แสดงหัวข้อ "สถานะการตรวจจับ" (iPad แนวนอนที่คอลัมน์ขวาสูงไม่พอ) เหลือแค่ป้ายสถานะ
+export const DetectionStatusBox: React.FC<{ status: DetectionStatus; height?: number; hideHeader?: boolean }> = ({ status, height, hideHeader = false }) => {
   const { icon: Icon, ...look } = describeStatus(status);
   const text = look.text;
   const compact = height !== undefined && height < 70;
@@ -89,7 +90,7 @@ export const DetectionStatusBox: React.FC<{ status: DetectionStatus; height?: nu
         .sb-status-in { animation: sb-status-in 0.25s ease-out; }
       `}</style>
 
-      <BoxHeader icon={Radar} title="สถานะการตรวจจับ" size={compact ? 'sm' : 'md'} />
+      {!hideHeader && <BoxHeader icon={Radar} title="สถานะการตรวจจับ" size={compact ? 'sm' : 'md'} />}
 
       {/* key เปลี่ยนตามสถานะ/คำ → เล่นแอนิเมชันเข้าใหม่ทุกครั้งที่สถานะเปลี่ยน */}
       <div

@@ -52,7 +52,7 @@ export const WordDetailPage: React.FC<WordDetailPageProps> = ({
   );
 
   return (
-    <div className="sb-detail-fade" style={detailPageContainerStyle(isMobileView, !isCompactView)}>
+    <div className="sb-detail-fade" style={detailPageContainerStyle(isMobileView, !isCompactView, isTabletView)}>
       <style>{DETAIL_PAGE_STYLES}</style>
 
       <PageHeader
@@ -61,13 +61,14 @@ export const WordDetailPage: React.FC<WordDetailPageProps> = ({
         badgeText="รายละเอียดคำศัพท์"
         title={wordName}
         isMobileView={isMobileView}
+        inline={isTabletView}
       />
 
       <VideoDetailLayout
         isMobileView={isMobileView}
         isCompactView={isCompactView}
         fillHeight={isTabletView}
-        video={<VideoBox src={videoSrc} label={categoryName} isCompactView={isCompactView} />}
+        video={<VideoBox src={videoSrc} label={categoryName} isCompactView={isCompactView} fill={isTabletView} />}
       >
         <div>
           <SectionTitle icon={SpellCheck} title="ชื่อคำศัพท์" />

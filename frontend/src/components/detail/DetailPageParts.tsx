@@ -24,11 +24,12 @@ export const DETAIL_PAGE_STYLES = `
   .sb-scroll::-webkit-scrollbar-thumb { background: #c7dbf5; border-radius: 10px; }
 `;
 
-export const detailPageContainerStyle = (isMobileView: boolean, fillHeight: boolean): React.CSSProperties => ({
+// dense (แท็บเล็ตแนวนอน/จอเตี้ย): ตัด padding ของหน้าเอง (<main> มี padding อยู่แล้ว) ให้แถววิดีโอสูงขึ้น
+export const detailPageContainerStyle = (isMobileView: boolean, fillHeight: boolean, dense = false): React.CSSProperties => ({
   flex: 1,
   display: 'flex',
   flexDirection: 'column',
-  padding: isMobileView ? '16px' : '24px',
+  padding: dense ? '0' : isMobileView ? '16px' : '24px',
   background: 'radial-gradient(circle at 100% 0%, #f0f7ff 0%, #eaf1fb 45%)',
   color: '#1e293b',
   height: fillHeight ? '100%' : 'auto',
@@ -42,10 +43,12 @@ interface PageHeaderProps {
   title: string;
   subtitle?: string;
   isMobileView: boolean;
+  // inline: ป้ายหัวข้อกับชื่อหน้าอยู่แถวเดียวกัน (แท็บเล็ตแนวนอน) ประหยัดความสูงให้วิดีโอ/รายละเอียด
+  inline?: boolean;
 }
 
 // ปุ่มย้อนกลับ + ป้ายหัวข้อ + ชื่อหน้า
-export const PageHeader: React.FC<PageHeaderProps> = ({ onBack, badgeIcon: BadgeIcon, badgeText, title, subtitle, isMobileView }) => (
+export const PageHeader: React.FC<PageHeaderProps> = ({ onBack, badgeIcon: BadgeIcon, badgeText, title, subtitle, isMobileView, inline = false }) => (
   <>
     <div
       style={{
@@ -54,7 +57,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ onBack, badgeIcon: Badge
         alignItems: 'center',
         justifyContent: onBack ? 'space-between' : 'center',
         gap: '12px',
-        marginBottom: '18px',
+        marginBottom: inline ? '12px' : '18px',
         flexShrink: 0
       }}
     >
@@ -86,8 +89,8 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ onBack, badgeIcon: Badge
         </button>
       )}
 
-      <div style={{ textAlign: 'center', minWidth: 0 }}>
-        <PageBadge icon={BadgeIcon} text={badgeText} marginBottom="8px" />
+      <div style={{ textAlign: 'center', minWidth: 0, display: inline ? 'flex' : 'block', alignItems: 'center', gap: '12px' }}>
+        <PageBadge icon={BadgeIcon} text={badgeText} marginBottom={inline ? '0' : '8px'} />
         <h2 style={{ fontSize: isMobileView ? '22px' : '26px', fontWeight: 800, color: '#1e293b', margin: 0 }}>{title}</h2>
         {subtitle && <p style={{ fontSize: '13.5px', color: '#64748b', margin: '4px 0 0 0' }}>{subtitle}</p>}
       </div>
@@ -96,12 +99,14 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ onBack, badgeIcon: Badge
       {onBack && !isMobileView && <div style={{ width: '120px', flexShrink: 0 }} />}
     </div>
 
-    <div style={{ width: '100%', height: '1px', background: 'linear-gradient(90deg, transparent, #dce8f7 15%, #dce8f7 85%, transparent)', marginBottom: '18px', flexShrink: 0 }} />
+    <div style={{ width: '100%', height: '1px', background: 'linear-gradient(90deg, transparent, #dce8f7 15%, #dce8f7 85%, transparent)', marginBottom: inline ? '14px' : '18px', flexShrink: 0 }} />
   </>
 );
 
 // กล่องวิดีโอ 16:9 (คลิปคำศัพท์และคลิปประโยคเป็น 1920x1080 ทั้งหมด) กดที่กล่องเพื่อเล่น/หยุด
-export const VideoBox: React.FC<{ src: string; label: string; isCompactView: boolean }> = ({ src, label, isCompactView }) => {
+// fill (แท็บเล็ตแนวนอน): สูงเต็มแถวเท่ากล่องรายละเอียด แล้วครอบภาพให้เต็มกล่อง (ตัดขอบซ้ายขวาที่เป็นฉากหลัง
+// ผู้แสดงท่ายืนกลางภาพเสมอ) แทนการคงสัดส่วน 16:9 ที่ทำให้วิดีโอเตี้ยในคอลัมน์แคบ
+export const VideoBox: React.FC<{ src: string; label: string; isCompactView: boolean; fill?: boolean }> = ({ src, label, isCompactView, fill = false }) => {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -125,7 +130,8 @@ export const VideoBox: React.FC<{ src: string; label: string; isCompactView: boo
       onClick={togglePlay}
       style={{
         width: '100%',
-        aspectRatio: '16 / 9',
+        height: fill ? '100%' : undefined,
+        aspectRatio: fill ? undefined : '16 / 9',
         maxHeight: isCompactView ? '60dvh' : undefined,
         backgroundColor: '#000000',
         borderRadius: '28px',
@@ -148,7 +154,7 @@ export const VideoBox: React.FC<{ src: string; label: string; isCompactView: boo
         playsInline
         loop
         preload="metadata"
-        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+        style={{ width: '100%', height: '100%', objectFit: fill ? 'cover' : 'contain' }}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
       />
@@ -205,13 +211,14 @@ export const VideoDetailLayout: React.FC<{ video: React.ReactNode; isMobileView:
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: isCompactView ? '1fr' : 'minmax(0, 1.5fr) minmax(340px, 1fr)',
+        // fillHeight: วิดีโอสูงเต็มแถวแล้ว แบ่งครึ่งให้กล่องรายละเอียดกว้างพอไม่ให้คำอธิบายตกบรรทัด
+        gridTemplateColumns: isCompactView ? '1fr' : fillHeight ? 'minmax(0, 1fr) minmax(0, 1fr)' : 'minmax(0, 1.5fr) minmax(340px, 1fr)',
         gap: isMobileView ? '14px' : '20px',
         alignItems: 'start',
         ...(fillHeight && !isCompactView ? { flex: 1, minHeight: 0, gridTemplateRows: 'minmax(0, 1fr)' } : {})
       }}
     >
-      {video}
+      {fillHeight && !isCompactView ? <div style={{ alignSelf: 'stretch', minHeight: 0 }}>{video}</div> : video}
       {isCompactView ? (
         <div style={panelStyle}>{children}</div>
       ) : (

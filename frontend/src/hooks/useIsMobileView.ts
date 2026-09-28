@@ -44,3 +44,24 @@ export function useIsTabletPortrait(): boolean {
   const isShort = useIsShortView(700);
   return isMobileView && !isNarrow && !isShort;
 }
+
+// แท็บเล็ตแนวนอน (เช่น iPad 1180x820): กว้างเกิน 1024px จึงใช้ layout แบบ PC แต่เป็นจอสัมผัส
+// ใช้ (pointer: coarse) แยกออกจากโน้ตบุ๊กขนาดเดียวกัน (1366x768, 1280x720) ที่ใช้เมาส์
+// จะได้ปรับเฉพาะ iPad โดยไม่กระทบกล่องบน PC ที่ลงตัวแล้ว
+export function useIsTabletLandscape(): boolean {
+  const isMobileView = useIsMobileView();
+  const isTabletWidth = useIsMobileView(1366);
+  const [isCoarse, setIsCoarse] = useState<boolean>(
+    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
+  );
+
+  useEffect(() => {
+    const mql = window.matchMedia('(pointer: coarse)');
+    const handleChange = (e: MediaQueryList | MediaQueryListEvent) => setIsCoarse(e.matches);
+    handleChange(mql);
+    mql.addEventListener('change', handleChange);
+    return () => mql.removeEventListener('change', handleChange);
+  }, []);
+
+  return !isMobileView && isTabletWidth && isCoarse;
+}

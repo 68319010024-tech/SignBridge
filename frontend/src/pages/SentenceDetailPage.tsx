@@ -54,7 +54,7 @@ export const SentenceDetailPage: React.FC<SentenceDetailPageProps> = ({ length, 
   const typeStyle = SENTENCE_TYPE_STYLE[sentence.type];
 
   return (
-    <div className="sb-detail-fade" style={detailPageContainerStyle(isMobileView, !isCompactView)}>
+    <div className="sb-detail-fade" style={detailPageContainerStyle(isMobileView, !isCompactView, isTabletView)}>
       <style>{DETAIL_PAGE_STYLES}</style>
 
       <PageHeader
@@ -63,13 +63,14 @@ export const SentenceDetailPage: React.FC<SentenceDetailPageProps> = ({ length, 
         badgeText={`ประโยค ${length} คำ`}
         title={sentenceText(sentence.thai)}
         isMobileView={isMobileView}
+        inline={isTabletView}
       />
 
       <VideoDetailLayout
         isMobileView={isMobileView}
         isCompactView={isCompactView}
         fillHeight={isTabletView}
-        video={<VideoBox src={sentenceVideoSrc(length, sentence)} label={`ประโยค${sentence.type}`} isCompactView={isCompactView} />}
+        video={<VideoBox src={sentenceVideoSrc(length, sentence)} label={`ประโยค${sentence.type}`} isCompactView={isCompactView} fill={isTabletView} />}
       >
         <div>
           <SectionTitle icon={Hand} title="ไวยากรณ์ภาษามือ" hint={grammarPattern(sentence.tsl)} />
