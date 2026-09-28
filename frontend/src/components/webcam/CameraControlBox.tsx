@@ -17,8 +17,6 @@ interface CameraControlBoxProps {
   // ให้ปุ่มห่างกัน (space-evenly) — Safari ไม่รองรับ
   // min-height: min-content ของ flex item กล่องจึงเคยถูกบีบจนปุ่มล่างโดนตัด
   grow?: boolean;
-  // มือถือ: กล่องกว้างเต็มจอ วางปุ่ม 4 ปุ่มเป็นตาราง 2x2 ให้กล่องเตี้ยลง
-  grid?: boolean;
 }
 
 // กล่องควบคุมกล้อง (ใช้ร่วมกันทั้งหน้าหลักและหน้าทบทวนไวยากรณ์)
@@ -31,89 +29,78 @@ export const CameraControlBox: React.FC<CameraControlBoxProps> = ({
   isShowSkeleton,
   onToggleSkeleton,
   compact = false,
-  grow = false,
-  grid = false
-}) => {
-  const buttons = (
-    <>
-      <button
-        onClick={onToggleCamera}
-        className="sb-primary-btn"
-        style={{
-          ...homeButtonStyle,
-          cursor: 'pointer',
-          background: isCameraOn ? BLUE_GRADIENT : 'linear-gradient(135deg, #b91c1c, #ef4444)',
-          color: '#ffffff',
-          boxShadow: isCameraOn ? '0 8px 18px -8px rgba(22,98,196,0.6)' : '0 8px 18px -8px rgba(220,38,38,0.6)'
-        }}
-      >
-        <span style={{ ...homeButtonIconStyle, backgroundColor: 'rgba(255,255,255,0.22)' }}>
-          <Camera style={{ width: '13px', height: '13px', color: '#ffffff' }} />
-        </span>
-        {isCameraOn ? 'เปิดกล้อง' : 'ปิดกล้อง'}
-      </button>
+  grow = false
+}) => (
+  // minHeight: overflow: hidden (ไว้ตัดไอคอนลายน้ำ) ทำให้ flex item หดต่ำกว่าเนื้อหาได้ — คืนค่าความสูงขั้นต่ำ = เนื้อหา
+  <div style={{ ...homeCardStyle, flex: grow ? '1 0 auto' : 1, minHeight: 'min-content', padding: compact ? '12px 14px' : '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: grow ? 'space-evenly' : 'center', gap: compact ? '7px' : '10px' }}>
+    <Camera style={{ ...homeWatermarkStyle, width: '96px', height: '96px', right: '-18px', top: '-16px' }} />
+    <BoxHeader icon={Camera} title="ควบคุมกล้อง" size={compact ? 'sm' : 'md'} />
 
+    <button
+      onClick={onToggleCamera}
+      className="sb-primary-btn"
+      style={{
+        ...homeButtonStyle,
+        cursor: 'pointer',
+        background: isCameraOn ? BLUE_GRADIENT : 'linear-gradient(135deg, #b91c1c, #ef4444)',
+        color: '#ffffff',
+        boxShadow: isCameraOn ? '0 8px 18px -8px rgba(22,98,196,0.6)' : '0 8px 18px -8px rgba(220,38,38,0.6)'
+      }}
+    >
+      <span style={{ ...homeButtonIconStyle, backgroundColor: 'rgba(255,255,255,0.22)' }}>
+        <Camera style={{ width: '13px', height: '13px', color: '#ffffff' }} />
+      </span>
+      {isCameraOn ? 'เปิดกล้อง' : 'ปิดกล้อง'}
+    </button>
+
+    <button
+      onClick={onSwitchCamera}
+      disabled={!isCameraOn}
+      className="sb-ghost-btn"
+      style={{
+        ...homeButtonStyle,
+        ...homeGhostStyle,
+        fontSize: '12.5px',
+        cursor: isCameraOn ? 'pointer' : 'not-allowed',
+        opacity: isCameraOn ? 1 : 0.4
+      }}
+    >
+      <span style={homeGhostIconStyle}>
+        <RefreshCw style={{ width: '12px', height: '12px', color: '#0d47a1' }} />
+      </span>
+      สลับกล้อง
+    </button>
+
+    {[
+      { icon: CloudFog, label: 'เบลอพื้นหลัง', on: isBlurBg, toggle: onToggleBlur },
+      { icon: Bone, label: 'แสดงโครงกระดูก', on: isShowSkeleton, toggle: onToggleSkeleton },
+    ].map((t) => (
       <button
-        onClick={onSwitchCamera}
+        key={t.label}
+        onClick={t.toggle}
         disabled={!isCameraOn}
         className="sb-ghost-btn"
         style={{
           ...homeButtonStyle,
           ...homeGhostStyle,
-          fontSize: '12.5px',
+          padding: '6px 10px',
+          fontSize: '11.5px',
+          justifyContent: 'space-between',
           cursor: isCameraOn ? 'pointer' : 'not-allowed',
           opacity: isCameraOn ? 1 : 0.4
         }}
       >
-        <span style={homeGhostIconStyle}>
-          <RefreshCw style={{ width: '12px', height: '12px', color: '#0d47a1' }} />
+        <span style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <t.icon style={{ width: '14px', height: '14px', color: t.on ? '#0d47a1' : '#64748b' }} />
+          {t.label}
         </span>
-        สลับกล้อง
+        {/* สวิตช์เปิด/ปิด */}
+        <span style={{ width: '32px', height: '18px', borderRadius: '9999px', padding: '2px', background: t.on ? BLUE_GRADIENT : '#cbd5e1', display: 'flex', alignItems: 'center', boxSizing: 'border-box', transition: 'background 0.3s', flexShrink: 0 }}>
+          <span style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transform: t.on ? 'translateX(14px)' : 'translateX(0)', transition: 'transform 0.3s' }} />
+        </span>
       </button>
-
-      {[
-        { icon: CloudFog, label: 'เบลอพื้นหลัง', on: isBlurBg, toggle: onToggleBlur },
-        { icon: Bone, label: grid ? 'โครงกระดูก' : 'แสดงโครงกระดูก', on: isShowSkeleton, toggle: onToggleSkeleton },
-      ].map((t) => (
-        <button
-          key={t.label}
-          onClick={t.toggle}
-          disabled={!isCameraOn}
-          className="sb-ghost-btn"
-          style={{
-            ...homeButtonStyle,
-            ...homeGhostStyle,
-            padding: grid ? '6px 8px' : '6px 10px',
-            fontSize: '11.5px',
-            whiteSpace: grid ? 'nowrap' : undefined,
-            justifyContent: 'space-between',
-            cursor: isCameraOn ? 'pointer' : 'not-allowed',
-            opacity: isCameraOn ? 1 : 0.4
-          }}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-            <t.icon style={{ width: '14px', height: '14px', color: t.on ? '#0d47a1' : '#64748b' }} />
-            {t.label}
-          </span>
-          {/* สวิตช์เปิด/ปิด */}
-          <span style={{ width: '32px', height: '18px', borderRadius: '9999px', padding: '2px', background: t.on ? BLUE_GRADIENT : '#cbd5e1', display: 'flex', alignItems: 'center', boxSizing: 'border-box', transition: 'background 0.3s', flexShrink: 0 }}>
-            <span style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transform: t.on ? 'translateX(14px)' : 'translateX(0)', transition: 'transform 0.3s' }} />
-          </span>
-        </button>
-      ))}
-    </>
-  );
-
-  return (
-    // minHeight: overflow: hidden (ไว้ตัดไอคอนลายน้ำ) ทำให้ flex item หดต่ำกว่าเนื้อหาได้ — คืนค่าความสูงขั้นต่ำ = เนื้อหา
-    <div style={{ ...homeCardStyle, flex: grow ? '1 0 auto' : 1, minHeight: 'min-content', padding: compact ? '12px 14px' : '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: grow ? 'space-evenly' : 'center', gap: compact ? '7px' : '10px' }}>
-      <Camera style={{ ...homeWatermarkStyle, width: '96px', height: '96px', right: '-18px', top: '-16px' }} />
-      <BoxHeader icon={Camera} title="ควบคุมกล้อง" size={compact ? 'sm' : 'md'} />
-      {grid ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '8px' }}>{buttons}</div>
-      ) : buttons}
-    </div>
-  );
-};
+    ))}
+  </div>
+);
 
 export default CameraControlBox;

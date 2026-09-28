@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Camera,
+  RefreshCw,
   Grid,
   Flag,
   Hand,
@@ -15,6 +16,8 @@ import {
   History,
   Menu,
   X,
+  CloudFog,
+  Bone,
   MessageSquareText,
   ChevronRight,
   Lightbulb
@@ -30,7 +33,8 @@ import SentenceDetailPage from './SentenceDetailPage';
 import { SENTENCES, type SentenceLength } from '../data/sentences';
 import { wordsData } from '../data/words';
 import { resolveWsUrl } from '../services/wsConfig';
-import { useIsMobileView, useIsShortView, useIsTabletPortrait, useIsTabletLandscape, useIsPhoneLandscape } from '../hooks/useIsMobileView';
+import { useIsMobileView, useIsShortView, useIsTabletPortrait, useIsTabletLandscape } from '../hooks/useIsMobileView';
+import { MobileControlButton } from '../components/common/MobileControlButton';
 import TooCloseWarning from '../components/webcam/TooCloseWarning';
 import { BoxHeader, homeCardStyle, homeWatermarkStyle, homeButtonStyle, homeButtonIconStyle, homeGhostStyle, homeGhostIconStyle } from '../components/common/BoxHeader';
 import CameraControlBox from '../components/webcam/CameraControlBox';
@@ -105,14 +109,10 @@ export const StudentDashboard: React.FC = () => {
   const isTabletPortrait = useIsTabletPortrait();
   // iPad แนวนอน: Safari มีแถบแท็บ/ที่อยู่ เหลือพื้นที่สูงราว 690px — ซ่อนหัวข้อกล่องสถานะให้คอลัมน์ขวาพอดีขอบล่างกล้อง
   const isTabletLandscape = useIsTabletLandscape();
-  // มือถือ (แคบ ≤700px หรือมือถือแนวนอน): ใช้กล่องชุดเดียวกับ PC — แนวตั้งเรียงกล่องต่อกันแล้วเลื่อนดู,
-  // แนวนอนวางกล้องซ้าย กล่องเรียงในคอลัมน์ขวาที่เลื่อนได้
-  const isPhone = isMobileView && !isTabletPortrait;
-  const isPhoneLandscape = useIsPhoneLandscape();
   // กล่องประโยคล่าสุดโผล่ตอนอัดประโยค — จอเตี้ยต้องบีบปุ่มในกล่องตรวจจับประโยคให้เหลือแถวเดียว
   const compactSentenceButtons = isShortView && isRecordingSentence;
   // iPad แนวนอน: ปุ่มในกล่องตรวจจับประโยคเรียงแถวเดียวเสมอ กล่องจะเตี้ยลง ให้ที่เหลือกับกล่องควบคุมกล้อง
-  const sentenceButtonsInRow = compactSentenceButtons || isTabletLandscape || isPhone;
+  const sentenceButtonsInRow = compactSentenceButtons || isTabletLandscape;
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   // State แสดงโครงกระดูก (skeleton overlay) ที่ backend วาดกลับมาให้
@@ -670,20 +670,19 @@ export const StudentDashboard: React.FC = () => {
       <Hand style={{ ...homeWatermarkStyle, width: '130px', height: '130px', right: '-20px', top: '-18px' }} />
 
       {!isRecordingSentence ? (
-        <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: isPhone ? 'flex-start' : 'center', padding: isPhone ? '12px 14px' : '16px', gap: isPhone ? '12px' : '18px', minWidth: 0 }}>
-          <div style={{ width: isPhone ? '44px' : '56px', height: isPhone ? '44px' : '56px', borderRadius: isPhone ? '14px' : '18px', background: BLUE_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 20px -10px rgba(22,98,196,0.7)', flexShrink: 0 }}>
-            <Aperture style={{ width: isPhone ? '22px' : '28px', height: isPhone ? '22px' : '28px', color: '#ffffff' }} />
+        <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', gap: '18px' }}>
+          <div style={{ width: '56px', height: '56px', borderRadius: '18px', background: BLUE_GRADIENT, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 20px -10px rgba(22,98,196,0.7)', flexShrink: 0 }}>
+            <Aperture style={{ width: '28px', height: '28px', color: '#ffffff' }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
             <span style={{ fontSize: '12.5px', fontWeight: 700, color: '#64748b' }}>ผลการตรวจจับคำเดี่ยว (Single Word)</span>
             {isCameraOn && singleWordResult ? (
-              // มือถือ: แถบความมั่นใจขึ้นบรรทัดใหม่เองถ้าคำยาวจนวางคู่กันไม่พอ
-              <div style={{ display: 'flex', alignItems: 'center', gap: isPhone ? '4px 14px' : '14px', flexWrap: isPhone ? 'wrap' : undefined }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <span key={singleWordResult.id} className="sb-word-pop" style={{ fontSize: '30px', fontWeight: 800, color: '#0d47a1', lineHeight: 1.2 }}>
                   {singleWordResult.word}
                 </span>
                 {/* แถบความมั่นใจ */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: isPhone ? '100px' : '120px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '120px' }}>
                   <span style={{ fontSize: '12px', fontWeight: 800, color: '#16a34a' }}>ความมั่นใจ {singleWordResult.confidence}%</span>
                   <div style={{ height: '6px', borderRadius: '9999px', backgroundColor: '#e2e8f0', overflow: 'hidden' }}>
                     <div style={{ width: `${singleWordResult.confidence}%`, height: '100%', borderRadius: '9999px', background: 'linear-gradient(90deg, #22c55e, #16a34a)', transition: 'width 0.4s ease' }} />
@@ -691,7 +690,7 @@ export const StudentDashboard: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <span style={{ fontSize: isPhone ? '14px' : '15px', fontWeight: 700, color: '#94a3b8', lineHeight: isPhone ? 1.5 : '36px' }}>ทำท่าภาษามือหน้ากล้องเพื่อเริ่มตรวจจับ</span>
+              <span style={{ fontSize: '15px', fontWeight: 700, color: '#94a3b8', lineHeight: '36px' }}>ทำท่าภาษามือหน้ากล้องเพื่อเริ่มตรวจจับ</span>
             )}
           </div>
         </div>
@@ -703,14 +702,14 @@ export const StudentDashboard: React.FC = () => {
           ].map((col, colIndex) => (
             <React.Fragment key={col.title}>
               {colIndex > 0 && <div style={{ width: '1px', background: 'linear-gradient(180deg, transparent, #dce8f7 20%, #dce8f7 80%, transparent)', flexShrink: 0 }} />}
-              <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: isPhone ? '12px 8px' : '14px 18px', minWidth: 0 }}>
-                <BoxHeader icon={col.icon} title={col.title} size={isPhone ? 'sm' : 'md'} />
+              <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', padding: '14px 18px', minWidth: 0 }}>
+                <BoxHeader icon={col.icon} title={col.title} />
                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap', justifyContent: 'center' }}>
                   {col.words.length > 0 ? (
                     col.words.map((word, idx) => (
                       <React.Fragment key={idx}>
                         {idx > 0 && <ChevronRight style={{ width: '14px', height: '14px', color: '#94a3b8' }} />}
-                        <span style={{ fontSize: isPhone ? '14px' : '16px', fontWeight: 800, color: '#0d47a1', backgroundColor: '#eef4fc', padding: isPhone ? '2px 8px' : '3px 12px', borderRadius: '10px' }}>{word}</span>
+                        <span style={{ fontSize: '16px', fontWeight: 800, color: '#0d47a1', backgroundColor: '#eef4fc', padding: '3px 12px', borderRadius: '10px' }}>{word}</span>
                       </React.Fragment>
                     ))
                   ) : (
@@ -727,7 +726,7 @@ export const StudentDashboard: React.FC = () => {
 
   // กล่องคำล่าสุด / คำที่สะสมตอนอัดประโยค — ขวาบนของ PC
   const lastWordBox = (
-    <div style={{ ...homeCardStyle, height: isPhone ? '84px' : '116px', padding: isPhone ? '10px 14px' : '14px', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '6px', textAlign: 'center', flexShrink: 0 }}>
+    <div style={{ ...homeCardStyle, height: '116px', padding: '14px', display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: '6px', textAlign: 'center', flexShrink: 0 }}>
       {!isRecordingSentence ? (
         <>
           <History style={{ ...homeWatermarkStyle, width: '84px', height: '84px', right: '-14px', top: '-14px' }} />
@@ -767,7 +766,7 @@ export const StudentDashboard: React.FC = () => {
 
   // กล่องตรวจจับประโยค
   const sentenceBox = (
-    <div style={{ ...homeCardStyle, flex: isTabletLandscape || isPhone ? '0 0 auto' : 1, minHeight: 'min-content', padding: isTabletLandscape ? '10px 14px' : isShortView ? '12px 14px' : '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: isTabletLandscape ? '6px' : isShortView ? '8px' : '12px' }}>
+    <div style={{ ...homeCardStyle, flex: isTabletLandscape ? '0 0 auto' : 1, minHeight: 'min-content', padding: isTabletLandscape ? '10px 14px' : isShortView ? '12px 14px' : '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: isTabletLandscape ? '6px' : isShortView ? '8px' : '12px' }}>
       <MessageSquareText style={{ ...homeWatermarkStyle, width: '96px', height: '96px', right: '-18px', top: '-16px' }} />
       <BoxHeader icon={MessageSquareText} title="ตรวจจับประโยค" size={isShortView ? 'sm' : 'md'} />
 
@@ -800,7 +799,7 @@ export const StudentDashboard: React.FC = () => {
             <PlayCircle style={{ width: '15px', height: '15px', color: '#ffffff' }} />
           )}
         </span>
-        {isRecordingSentence ? (sentenceButtonsInRow && !isPhone ? 'แปลผล' : 'แปลผลประโยค') : (sentenceButtonsInRow && !isPhone ? 'เริ่มอัด' : 'เริ่มอัดประโยค')}
+        {isRecordingSentence ? (sentenceButtonsInRow ? 'แปลผล' : 'แปลผลประโยค') : (sentenceButtonsInRow ? 'เริ่มอัด' : 'เริ่มอัดประโยค')}
       </button>
 
       <button
@@ -822,7 +821,7 @@ export const StudentDashboard: React.FC = () => {
         <span style={homeGhostIconStyle}>
           <RotateCcw style={{ width: '13px', height: '13px', color: '#0d47a1' }} />
         </span>
-        {sentenceButtonsInRow && !isPhone ? 'ล้าง' : 'ล้างประโยค'}
+        {sentenceButtonsInRow ? 'ล้าง' : 'ล้างประโยค'}
       </button>
       </div>
     </div>
@@ -840,7 +839,6 @@ export const StudentDashboard: React.FC = () => {
       onToggleSkeleton={() => setIsShowSkeleton(!isShowSkeleton)}
       compact={isShortView}
       grow={isTabletLandscape}
-      grid={isPhone && !isPhoneLandscape}
     />
   );
 
@@ -1093,37 +1091,105 @@ export const StudentDashboard: React.FC = () => {
         <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'auto', WebkitOverflowScrolling: 'touch', background: 'radial-gradient(circle at 100% 0%, #f0f7ff 0%, #eaf1fb 45%)', padding: isTabletPortrait ? '16px' : isMobileView ? '12px' : '24px' }}>
 
           {/* 1. หน้าหลัก */}
-          {activeTab === 'home' && (isPhoneLandscape ? (
-            // มือถือแนวนอน: กล้องซ้ายสูงเต็มจอ คอลัมน์ขวาเรียงกล่องตามคอลัมน์ขวาของ PC (ผลตรวจจับอยู่บนสุดให้เห็นเสมอ)
-            // แล้วเลื่อนดูกล่องที่เหลือในคอลัมน์ขวาเอง กล้องจะได้ไม่เลื่อนหายไป
-            <div className="sb-fade-in" style={{ flex: 1, minHeight: 0, display: 'flex', gap: '12px' }}>
-              {cameraBox}
-              <div style={{ width: '320px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-                {resultBox}
-                <DetectionStatusBox status={detectionStatus} height={84} />
-                {lastWordBox}
-                {lastSentenceBox}
-                {sentenceBox}
-                <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>{cameraControlBox}</div>
-              </div>
-            </div>
-          ) : isPhone ? (
-            // มือถือแนวตั้ง: กล่องชุดเดียวกับ PC เรียงลงมา — ผลตรวจจับบนสุด ตามด้วยกล้อง (เห็นพร้อมกันในจอเดียว)
-            // สถานะการตรวจจับอยู่ติดใต้กล้อง แล้วต่อด้วยกล่องในคอลัมน์ขวาของ PC ให้เลื่อนลงไปกด
-            // ไม่ใส่ flex:1/minHeight:0 โดยตั้งใจ: ให้ <main> (overflow:auto) เป็นตัวเลื่อนเพียงจุดเดียว
-            <div className="sb-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {resultBox}
+          {activeTab === 'home' && (isMobileView && !isTabletPortrait ? (
+            // ไม่ใส่ flex:1/minHeight:0 ที่นี่โดยตั้งใจ: ให้ความสูงคำนวณจาก content จริง แล้วปล่อยให้
+            // <main> ด้านบน (ซึ่งตั้ง overflow:auto ไว้แล้ว) เป็นตัวเลื่อนเพียงจุดเดียว ถ้าตั้ง flex:1
+            // + minHeight:0 ตรงนี้ด้วย จะกลายเป็นบีบอัด content ให้พอดีกรอบแทนการล้นแล้วเลื่อนดูได้
+            <div className="sb-fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-              {/* ใช้ aspect-ratio แทน flex:1 ให้ความสูงแน่นอน (กล้องหน้ามือถือแนวตั้งเป็นภาพ 3:4) */}
+              {/* กล่องสถานะผลตรวจจับ (ย่อ) */}
+              <div style={{ backgroundColor: '#ffffff', border: '1px solid #e3ecf7', borderRadius: '18px', padding: '12px 14px', flexShrink: 0, boxShadow: '0 6px 16px -10px rgba(13,71,161,0.16)' }}>
+                {!isRecordingSentence ? (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#94a3b8' }}>คำเดี่ยว (Single Word)</span>
+                      {isCameraOn && previousWord && (
+                        <span style={{ fontSize: '10.5px', fontWeight: 700, color: '#94a3b8' }}>
+                          ล่าสุด: <span style={{ color: '#64748b' }}>{previousWord}</span>
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginTop: '3px' }}>
+                      {isCameraOn && singleWordResult ? (
+                        <>
+                          <span key={singleWordResult.id} className="sb-word-pop" style={{ fontSize: '22px', fontWeight: '800', color: '#0d47a1' }}>{singleWordResult.word}</span>
+                          <span style={{ fontSize: '12.5px', fontWeight: 'bold', color: '#16a34a' }}>({singleWordResult.confidence}%)</span>
+                        </>
+                      ) : (
+                        <span style={{ color: '#94a3b8', letterSpacing: '3px', fontSize: '15px', fontFamily: 'monospace' }}>--------</span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Flag style={{ width: '12px', height: '12px', color: '#0d47a1', flexShrink: 0 }} />
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b', flexShrink: 0 }}>ไวยากรณ์ไทย:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: transformedWords.length > 0 ? '#0d47a1' : '#94a3b8' }}>
+                        {transformedWords.length > 0 ? transformedWords.join(' - ') : '-'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Hand style={{ width: '12px', height: '12px', color: '#0d47a1', flexShrink: 0 }} />
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e293b', flexShrink: 0 }}>ไวยากรณ์มือ:</span>
+                      <span style={{ fontSize: '13px', fontWeight: 800, color: recordedWords.length > 0 ? '#0d47a1' : '#94a3b8' }}>
+                        {recordedWords.length > 0 ? recordedWords.join(' - ') : '-'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* กล่องแสดงภาพกล้อง: ใช้ aspect-ratio แทน flex:1 เพื่อให้ความสูงรวมของหน้าคำนวณได้แน่นอน
+                  (ไม่งั้นทั้งกล่องนี้และ toolbar ด้านล่างจะแย่งพื้นที่กันจนบางส่วนหลุดจอ) */}
               <div style={{ width: '100%', aspectRatio: '3 / 4', display: 'flex', flexShrink: 0 }}>
                 {cameraBox}
               </div>
 
-              <DetectionStatusBox status={detectionStatus} height={84} />
-              {lastWordBox}
-              {lastSentenceBox}
-              {sentenceBox}
-              {cameraControlBox}
+              {/* แถบไอคอนควบคุม: แตะไอคอนเพื่อสั่งงานฟังก์ชันนั้นทันที (แทนการ์ดเต็มจอที่เบียดกันบนมือถือ) */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', flexShrink: 0 }}>
+                <MobileControlButton
+                  icon={Camera}
+                  label={isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
+                  active
+                  variant={isCameraOn ? 'default' : 'danger'}
+                  onClick={toggleCamera}
+                />
+                <MobileControlButton
+                  icon={RefreshCw}
+                  label="สลับกล้อง"
+                  disabled={!isCameraOn}
+                  onClick={switchCamera}
+                />
+                <MobileControlButton
+                  icon={isRecordingSentence ? StopCircle : PlayCircle}
+                  label={isRecordingSentence ? 'แปลผลประโยค' : 'เริ่มอัดประโยค'}
+                  active
+                  variant={isRecordingSentence ? 'danger' : 'success'}
+                  disabled={!isCameraOn}
+                  onClick={toggleSentenceRecording}
+                />
+                <MobileControlButton
+                  icon={RotateCcw}
+                  label="ล้างประโยค"
+                  disabled={!isCameraOn}
+                  onClick={clearSentence}
+                />
+                <MobileControlButton
+                  icon={CloudFog}
+                  label="เบลอพื้นหลัง"
+                  active={isBlurBg}
+                  disabled={!isCameraOn}
+                  onClick={() => setIsBlurBg((v) => !v)}
+                />
+                <MobileControlButton
+                  icon={Bone}
+                  label="แสดงโครงกระดูก"
+                  active={isShowSkeleton}
+                  disabled={!isCameraOn}
+                  onClick={() => setIsShowSkeleton((v) => !v)}
+                />
+              </div>
             </div>
           ) : isTabletPortrait ? (
             // แท็บเล็ตแนวตั้ง: กล่องชุดเดียวกับ PC — แถวบน (ผลตรวจจับ | คำล่าสุด) เหมือน PC, กล้องยืดเต็มที่ว่าง,
