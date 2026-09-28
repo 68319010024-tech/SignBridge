@@ -36,6 +36,7 @@ import { resolveWsUrl } from '../services/wsConfig';
 import { useIsMobileView, useIsShortView, useIsTabletPortrait, useIsTabletLandscape, useIsPhoneLandscape } from '../hooks/useIsMobileView';
 import { MobileControlButton } from '../components/common/MobileControlButton';
 import TooCloseWarning from '../components/webcam/TooCloseWarning';
+import { drawBlurredImage } from '../components/webcam/drawBlurredImage';
 import { BoxHeader, homeCardStyle, homeWatermarkStyle, homeButtonStyle, homeButtonIconStyle, homeGhostStyle, homeGhostIconStyle } from '../components/common/BoxHeader';
 import CameraControlBox from '../components/webcam/CameraControlBox';
 import { BLUE_GRADIENT } from '../components/common/theme';
@@ -256,10 +257,9 @@ export const StudentDashboard: React.FC = () => {
             ctx.globalCompositeOperation = 'source-in';
             ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
 
-            // 3. ฉากหลังเบลอ 20px
+            // 3. ฉากหลังเบลอ 20px (Safari ไม่รองรับ ctx.filter — ใช้ drawBlurredImage ที่มีวิธีสำรอง)
             ctx.globalCompositeOperation = 'destination-over';
-            ctx.filter = 'blur(20px)';
-            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+            drawBlurredImage(ctx, results.image, canvas.width, canvas.height, 20);
           } else {
             ctx.filter = 'none';
             ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
@@ -319,10 +319,8 @@ export const StudentDashboard: React.FC = () => {
     }
 
     if (isBlurBgRef.current) {
-      ctx.filter = 'blur(16px)';
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      drawBlurredImage(ctx, video, canvas.width, canvas.height, 16);
 
-      ctx.filter = 'none';
       ctx.beginPath();
       ctx.ellipse(canvas.width / 2, canvas.height / 1.7, canvas.width * 0.38, canvas.height * 0.5, 0, 0, 2 * Math.PI);
       ctx.clip();
@@ -914,10 +912,11 @@ export const StudentDashboard: React.FC = () => {
         onClick={toggleSentenceRecording}
       />
       <MobileControlButton
-        icon={RotateCcw}
-        label="ล้างประโยค"
+        icon={Bone}
+        label="แสดงโครงกระดูก"
+        active={isShowSkeleton}
         disabled={!isCameraOn}
-        onClick={clearSentence}
+        onClick={() => setIsShowSkeleton((v) => !v)}
       />
       <MobileControlButton
         icon={CloudFog}
@@ -927,11 +926,10 @@ export const StudentDashboard: React.FC = () => {
         onClick={() => setIsBlurBg((v) => !v)}
       />
       <MobileControlButton
-        icon={Bone}
-        label="แสดงโครงกระดูก"
-        active={isShowSkeleton}
+        icon={RotateCcw}
+        label="ล้างประโยค"
         disabled={!isCameraOn}
-        onClick={() => setIsShowSkeleton((v) => !v)}
+        onClick={clearSentence}
       />
     </div>
   );

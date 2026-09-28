@@ -23,6 +23,7 @@ import { useIsMobileView, useIsShortView, useIsTabletPortrait, useIsTabletLandsc
 import { PageBadge } from '../components/common/PageBadge';
 import { MobileControlButton } from '../components/common/MobileControlButton';
 import TooCloseWarning from '../components/webcam/TooCloseWarning';
+import { drawBlurredImage } from '../components/webcam/drawBlurredImage';
 import DetectionStatusBox, { resolveDetectionStatus, describeStatus } from '../components/webcam/DetectionStatusBox';
 import CameraControlBox from '../components/webcam/CameraControlBox';
 import ResultPopup from '../components/game/ResultPopup';
@@ -491,8 +492,8 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
             ctx.globalCompositeOperation = 'source-in';
             ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
             ctx.globalCompositeOperation = 'destination-over';
-            ctx.filter = 'blur(20px)';
-            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+            // Safari ไม่รองรับ ctx.filter — ใช้ drawBlurredImage ที่มีวิธีสำรอง
+            drawBlurredImage(ctx, results.image, canvas.width, canvas.height, 20);
           } else {
             ctx.filter = 'none';
             ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
