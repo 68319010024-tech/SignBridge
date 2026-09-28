@@ -43,6 +43,8 @@ import DetectionStatusBox, { resolveDetectionStatus } from '../components/webcam
 
 const WS_URL = resolveWsUrl();
 const FRAME_SEND_INTERVAL_MS = 100; // ~10 FPS
+// ด้านยาวสุดของภาพที่ส่งไป server — ต้องตรงกับ MAX_PROCESS_DIM ใน ai-engine/src/server.py
+const MAX_SEND_DIM = 800;
 
 type WsStatus = 'connecting' | 'connected' | 'disconnected';
 
@@ -129,6 +131,9 @@ export const StudentDashboard: React.FC = () => {
   const frameTickerRef = useRef<Worker | null>(null);
   const isCameraOnRef = useRef(isCameraOn);
   const isShowSkeletonRef = useRef(isShowSkeleton);
+  // loop วาดภาพกล้อง (requestAnimationFrame) ถูกสร้างครั้งเดียวตอนเปิดกล้อง จึงต้องอ่านค่าล่าสุดผ่าน ref
+  const isBlurBgRef = useRef(isBlurBg);
+  const isMirroredRef = useRef(isMirrored);
   const lastWordRef = useRef<string | null>(null);
   const lastPredictionIdRef = useRef<number>(-1);
   const lastRejectedIdRef = useRef<number>(-1);
@@ -279,7 +284,9 @@ export const StudentDashboard: React.FC = () => {
     const canvas = canvasRef.current;
 
     if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
-      if (selfieSegRef.current) {
+      // AI ตัดพื้นหลัง (Selfie Segmentation) ใช้เฉพาะตอนเปิดเบลอพื้นหลัง — ถ้ารันทุกเฟรมตลอดเวลา
+      // iPad จะทำงานหนักจนร้อนและช้าลงเมื่อใช้ไปนาน ๆ (ภาพและผลตรวจจับหน่วง)
+      if (selfieSegRef.current && isBlurBgRef.current) {
         try {
           await selfieSegRef.current.send({ image: video });
         } catch (e) {
@@ -304,12 +311,12 @@ export const StudentDashboard: React.FC = () => {
 
     ctx.save();
 
-    if (isMirrored) {
+    if (isMirroredRef.current) {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
     }
 
-    if (isBlurBg) {
+    if (isBlurBgRef.current) {
       ctx.filter = 'blur(16px)';
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
@@ -371,6 +378,11 @@ export const StudentDashboard: React.FC = () => {
     isShowSkeletonRef.current = isShowSkeleton;
     if (!isShowSkeleton) setSkeletonFrame(null);
   }, [isShowSkeleton]);
+
+  useEffect(() => {
+    isBlurBgRef.current = isBlurBg;
+    isMirroredRef.current = isMirrored;
+  }, [isBlurBg, isMirrored]);
 
   // ปิด sidebar drawer อัตโนมัติเมื่อจอขยายกลับไปเป็นโหมด desktop
   useEffect(() => {
@@ -528,12 +540,17 @@ export const StudentDashboard: React.FC = () => {
 
       if (!isCameraOnRef.current || !video || video.readyState !== video.HAVE_ENOUGH_DATA) return;
       if (!sendCanvas || !socket || socket.readyState !== WebSocket.OPEN) return;
+      // เฟรมก่อนหน้ายังอัปโหลดไม่เสร็จ (เน็ตช้า) → ข้ามเฟรมนี้ ไม่ให้เฟรมค้างเป็นคิวจน delay สะสมยาวขึ้นเรื่อย ๆ
+      if (socket.bufferedAmount > 0) return;
 
       const ctx = sendCanvas.getContext('2d');
       if (!ctx) return;
 
-      sendCanvas.width = video.videoWidth;
-      sendCanvas.height = video.videoHeight;
+      // ย่อให้ด้านยาวไม่เกิน MAX_SEND_DIM (เท่ากับที่ server ย่อก่อนประมวลผลอยู่แล้ว) ภาพที่ AI ได้เท่าเดิม
+      // แต่ข้อมูลที่ต้องส่งเหลือไม่ถึงครึ่ง
+      const scale = Math.min(1, MAX_SEND_DIM / Math.max(video.videoWidth, video.videoHeight));
+      sendCanvas.width = Math.round(video.videoWidth * scale);
+      sendCanvas.height = Math.round(video.videoHeight * scale);
       ctx.drawImage(video, 0, 0, sendCanvas.width, sendCanvas.height);
 
       const base64 = sendCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];

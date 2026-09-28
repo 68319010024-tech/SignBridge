@@ -31,6 +31,8 @@ import { BLUE_GRADIENT } from '../components/common/theme';
 
 const WS_URL = resolveWsUrl();
 const FRAME_SEND_INTERVAL_MS = 100;
+// ด้านยาวสุดของภาพที่ส่งไป server — ต้องตรงกับ MAX_PROCESS_DIM ใน ai-engine/src/server.py
+const MAX_SEND_DIM = 800;
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 type WsStatus = 'connecting' | 'connected' | 'disconnected';
@@ -351,6 +353,9 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
 
   const isCameraOnRef = useRef(isCameraOn);
   const isShowSkeletonRef = useRef(isShowSkeleton);
+  // loop วาดภาพกล้อง (requestAnimationFrame) ถูกสร้างครั้งเดียวตอนเปิดกล้อง จึงต้องอ่านค่าล่าสุดผ่าน ref
+  const isBlurBgRef = useRef(isBlurBg);
+  const isMirroredRef = useRef(isMirrored);
 
   useEffect(() => {
     isCameraOnRef.current = isCameraOn;
@@ -360,6 +365,11 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
     isShowSkeletonRef.current = isShowSkeleton;
     if (!isShowSkeleton) setSkeletonFrame(null);
   }, [isShowSkeleton]);
+
+  useEffect(() => {
+    isBlurBgRef.current = isBlurBg;
+    isMirroredRef.current = isMirrored;
+  }, [isBlurBg, isMirrored]);
 
   // ล้างค่าคำทายสะสม
   const clearPredictions = () => {
@@ -502,7 +512,9 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
     const canvas = canvasRef.current;
 
     if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
-      if (selfieSegRef.current) {
+      // AI ตัดพื้นหลัง (Selfie Segmentation) ใช้เฉพาะตอนเปิดเบลอพื้นหลัง — ถ้ารันทุกเฟรมตลอดเวลา
+      // iPad จะทำงานหนักจนร้อนและช้าลงเมื่อใช้ไปนาน ๆ (ภาพและผลตรวจจับหน่วง)
+      if (selfieSegRef.current && isBlurBgRef.current) {
         try {
           await selfieSegRef.current.send({ image: video });
         } catch (e) {
@@ -524,7 +536,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
     canvas.height = video.videoHeight;
     ctx.save();
 
-    if (isMirrored) {
+    if (isMirroredRef.current) {
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
     }
@@ -636,12 +648,17 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
 
       if (!isCameraOnRef.current || !video || video.readyState !== video.HAVE_ENOUGH_DATA) return;
       if (!sendCanvas || !socket || socket.readyState !== WebSocket.OPEN) return;
+      // เฟรมก่อนหน้ายังอัปโหลดไม่เสร็จ (เน็ตช้า) → ข้ามเฟรมนี้ ไม่ให้เฟรมค้างเป็นคิวจน delay สะสมยาวขึ้นเรื่อย ๆ
+      if (socket.bufferedAmount > 0) return;
 
       const ctx = sendCanvas.getContext('2d');
       if (!ctx) return;
 
-      sendCanvas.width = video.videoWidth;
-      sendCanvas.height = video.videoHeight;
+      // ย่อให้ด้านยาวไม่เกิน MAX_SEND_DIM (เท่ากับที่ server ย่อก่อนประมวลผลอยู่แล้ว) ภาพที่ AI ได้เท่าเดิม
+      // แต่ข้อมูลที่ต้องส่งเหลือไม่ถึงครึ่ง
+      const scale = Math.min(1, MAX_SEND_DIM / Math.max(video.videoWidth, video.videoHeight));
+      sendCanvas.width = Math.round(video.videoWidth * scale);
+      sendCanvas.height = Math.round(video.videoHeight * scale);
       ctx.drawImage(video, 0, 0, sendCanvas.width, sendCanvas.height);
 
       const base64 = sendCanvas.toDataURL('image/jpeg', 0.95).split(',')[1];
