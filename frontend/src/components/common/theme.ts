@@ -22,5 +22,5 @@ export const HERO_CARD_STYLES = `
 export const GOLD = '#bc9945';
 export const GOLD_GRADIENT = 'linear-gradient(135deg, #9c7c32 0%, #bc9945 55%, #d2b673 100%)';
 export const GOLD_GLOW = 'rgba(188, 153, 69, 0.55)';
-// แถบหัวเว็บ /ai2/: ไล่เฉดทองแบบเดียวกับแถบน้ำเงินของ /ai/ (เข้ม → เข้มกว่า → กลาง → อ่อน → อ่อนสุด)
-export const GOLD_TOPBAR_GRADIENT = 'linear-gradient(120deg, #a5852f 0%, #8c6f28 28%, #bc9945 55%, #d4b977 82%, #e2cd98 100%)';
+// แถบหัวเว็บ /ai2/: ไล่เฉดแดง #C3002F แบบเดียวกับแถบน้ำเงินของ /ai/ (เข้ม → เข้มกว่า → กลาง → อ่อน → อ่อนสุด)
+export const RED_TOPBAR_GRADIENT = 'linear-gradient(120deg, #c3002f 0%, #8f0022 28%, #b0002a 55%, #e2486a 82%, #ef7f97 100%)';

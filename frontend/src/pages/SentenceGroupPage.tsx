@@ -4,7 +4,7 @@ import { useIsMobileView } from '../hooks/useIsMobileView';
 import { SENTENCES, SentenceLength, SentenceType } from '../data/sentences';
 import { PageHeader, DETAIL_PAGE_STYLES, detailPageContainerStyle } from '../components/detail/DetailPageParts';
 import { SentenceTypeIcon } from '../components/sentence/SentenceTypeIcon';
-import { BLUE_GRADIENT, BLUE_GLOW, GOLD_GRADIENT, GOLD_GLOW } from '../components/common/theme';
+import { BLUE_GRADIENT, BLUE_GLOW } from '../components/common/theme';
 
 interface SentenceGroupPageProps {
   onSelectLength: (length: SentenceLength) => void;
@@ -161,9 +161,8 @@ export const SentenceGroupPage: React.FC<SentenceGroupPageProps> = ({ onSelectLe
                   </span>
                 </div>
 
-                {/* /ai2/ ใช้สีทอง */}
                 <div
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: __SB_RED_THEME__ ? GOLD_GRADIENT : BLUE_GRADIENT, color: '#ffffff', padding: '12px 14px 12px 20px', borderRadius: '9999px', boxShadow: `0 10px 20px -10px ${__SB_RED_THEME__ ? GOLD_GLOW : BLUE_GLOW}` }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: BLUE_GRADIENT, color: '#ffffff', padding: '12px 14px 12px 20px', borderRadius: '9999px', boxShadow: `0 10px 20px -10px ${BLUE_GLOW}` }}
                 >
                   <span style={{ fontSize: '15px', fontWeight: 800 }}>ดูทั้ง {items.length} ประโยค</span>
                   <span style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

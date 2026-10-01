@@ -39,7 +39,7 @@ import TooCloseWarning from '../components/webcam/TooCloseWarning';
 import { drawBlurredImage } from '../components/webcam/drawBlurredImage';
 import { BoxHeader, homeCardStyle, homeWatermarkStyle, homeButtonStyle, homeButtonIconStyle, homeGhostStyle, homeGhostIconStyle } from '../components/common/BoxHeader';
 import CameraControlBox from '../components/webcam/CameraControlBox';
-import { BLUE_GRADIENT, GOLD, GOLD_GRADIENT, GOLD_GLOW, GOLD_TOPBAR_GRADIENT } from '../components/common/theme';
+import { BLUE_GRADIENT, GOLD, GOLD_GRADIENT, GOLD_GLOW, RED_TOPBAR_GRADIENT } from '../components/common/theme';
 import headerLogos from 'virtual:sb-header-logos';
 import DetectionStatusBox, { resolveDetectionStatus } from '../components/webcam/DetectionStatusBox';
 
@@ -950,14 +950,14 @@ export const StudentDashboard: React.FC = () => {
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap');
 
         .sb-nav-item { transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease; }
-        .sb-topbar { background: ${__SB_RED_THEME__ ? GOLD_TOPBAR_GRADIENT : 'linear-gradient(120deg, #0d47a1 0%, #123a80 28%, #1a5aa8 55%, #4fa3e0 82%, #6fbeef 100%)'}; }
+        .sb-topbar { background: ${__SB_RED_THEME__ ? RED_TOPBAR_GRADIENT : 'linear-gradient(120deg, #0d47a1 0%, #123a80 28%, #1a5aa8 55%, #4fa3e0 82%, #6fbeef 100%)'}; }
         .sb-topbar > * { position: relative; }
         .sb-topbar > .sb-topbar-orb, .sb-topbar > .sb-topbar-shine { position: absolute; }
         .sb-topbar-orb { border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.18), rgba(255,255,255,0) 70%); pointer-events: none; animation: sb-topbar-orb 10s ease-in-out infinite; }
         @keyframes sb-topbar-orb { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(40px, 18px); } }
         .sb-topbar-shine { top: 0; bottom: 0; width: 180px; left: -200px; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.16), transparent); pointer-events: none; animation: sb-topbar-shine 7s ease-in-out infinite; }
         @keyframes sb-topbar-shine { 0% { left: -200px; } 45%, 100% { left: 110%; } }
-        .sb-topbar-ring { position: absolute; inset: 0; border-radius: 50%; background: ${__SB_RED_THEME__ ? 'conic-gradient(from 0deg, #ffffff, #8c6f28, #f3e7c6, #ffffff)' : 'conic-gradient(from 0deg, #ffffff, #6fbeef, #bfe1f9, #ffffff)'}; animation: sb-topbar-spin 6s linear infinite; opacity: 0.9; }
+        .sb-topbar-ring { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 0deg, #ffffff, #6fbeef, #bfe1f9, #ffffff); animation: sb-topbar-spin 6s linear infinite; opacity: 0.9; }
         @keyframes sb-topbar-spin { to { transform: rotate(360deg); } }
         .sb-topbar-wave { transform-origin: 70% 80%; animation: sb-topbar-wave 5s ease-in-out infinite; }
         @keyframes sb-topbar-wave { 0%, 76%, 100% { transform: rotate(0deg); } 80% { transform: rotate(16deg); } 84% { transform: rotate(-10deg); } 88% { transform: rotate(14deg); } 92% { transform: rotate(-6deg); } }
@@ -990,7 +990,7 @@ export const StudentDashboard: React.FC = () => {
       `}</style>
 
       {/* TOPBAR */}
-      <header className="sb-topbar" style={{ height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0, boxShadow: __SB_RED_THEME__ ? '0 4px 16px -4px rgba(140,111,40,0.45)' : '0 4px 16px -4px rgba(13,71,161,0.4)', position: 'relative', zIndex: 2, overflow: 'hidden' }}>
+      <header className="sb-topbar" style={{ height: '72px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', flexShrink: 0, boxShadow: '0 4px 16px -4px rgba(13,71,161,0.4)', position: 'relative', zIndex: 2, overflow: 'hidden' }}>
         <span className="sb-topbar-orb" style={{ width: '220px', height: '220px', left: '32%', top: '-150px' }} />
         <span className="sb-topbar-orb" style={{ width: '160px', height: '160px', right: '14%', top: '-40px', animationDelay: '-4s' }} />
         <span className="sb-topbar-shine" />
@@ -1025,7 +1025,7 @@ export const StudentDashboard: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: isMobileView ? '6px' : '8px', flexShrink: 0 }}>
               {headerLogos.map((src) => (
                 <div key={src} style={{ width: isMobileView ? '36px' : '44px', height: isMobileView ? '36px' : '44px', backgroundColor: '#ffffff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxShadow: '0 3px 10px rgba(0,0,0,0.18)' }}>
-                  <img src={src} alt="" style={{ width: '96%', height: '96%', objectFit: 'contain' }} />
+                  <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
               ))}
             </div>
@@ -1041,7 +1041,7 @@ export const StudentDashboard: React.FC = () => {
             <h1 style={{ fontSize: '20px', fontWeight: '800', color: '#ffffff', margin: 0, letterSpacing: '0.2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               SignBridge <span style={{ fontWeight: '500', opacity: 0.85 }}>By IT-HTC</span>
             </h1>
-            <p style={{ fontSize: '12px', fontWeight: '500', color: __SB_RED_THEME__ ? '#fdf6e3' : '#dbeeff', margin: '1px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <p style={{ fontSize: '12px', fontWeight: '500', color: '#dbeeff', margin: '1px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               นวัตกรรมระบบช่วยเรียนรู้ภาษาเขียนไทยสำหรับเด็กบกพร่องทางการได้ยิน
             </p>
           </div>

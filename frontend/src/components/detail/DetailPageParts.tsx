@@ -1,6 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Play, Pause, Tag } from 'lucide-react';
 import { PageBadge } from '../common/PageBadge';
+import { GOLD, GOLD_GLOW } from '../common/theme';
+
+// กรอบวิดีโอและปุ่มเล่น: /ai2/ ใช้สีทองให้เข้ากับกรอบกล้องในหน้าหลัก
+const VIDEO_ACCENT = __SB_RED_THEME__ ? GOLD : '#0d47a1';
+const VIDEO_GLOW = __SB_RED_THEME__ ? GOLD_GLOW : 'rgba(13, 71, 161, 0.4)';
+const VIDEO_FRAME_SHADOW = __SB_RED_THEME__
+  ? `0 0 25px ${GOLD_GLOW}, inset 0 0 15px rgba(188, 153, 69, 0.2)`
+  : '0 0 25px rgba(13, 71, 161, 0.35), inset 0 0 15px rgba(13, 71, 161, 0.15)';
+const VIDEO_PLAY_HOVER_GLOW = __SB_RED_THEME__ ? GOLD_GLOW : 'rgba(13, 71, 161, 0.55)';
 
 // ส่วนประกอบร่วมของหน้ารายละเอียดแบบ "วิดีโอซ้าย + กล่องรายละเอียดขวา"
 // ใช้ทั้งหน้าตัวอย่างประโยค (SentenceDetailPage) และหน้ารายละเอียดคำศัพท์ (WordDetailPage)
@@ -16,7 +25,7 @@ export const DETAIL_PAGE_STYLES = `
   .sb-detail-card { transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease; }
   .sb-detail-card:hover { transform: translateY(-4px); border-color: #0d47a1 !important; box-shadow: 0 12px 28px -8px rgba(13,71,161,0.28) !important; }
   .sb-detail-card:active { transform: translateY(-1px) scale(0.98); }
-  .sb-detail-video:hover .sb-detail-play { transform: translate(-50%, -50%) scale(1.06); box-shadow: 0 0 32px rgba(13, 71, 161, 0.55); }
+  .sb-detail-video:hover .sb-detail-play { transform: translate(-50%, -50%) scale(1.06); box-shadow: 0 0 32px ${VIDEO_PLAY_HOVER_GLOW}; }
   .sb-detail-link { transition: background-color 0.2s ease, border-color 0.2s ease; }
   .sb-detail-link:hover { background-color: #eef4fc !important; border-color: #9cc0ea !important; }
   .sb-scroll::-webkit-scrollbar { width: 8px; }
@@ -135,14 +144,14 @@ export const VideoBox: React.FC<{ src: string; label: string; isCompactView: boo
         maxHeight: isCompactView ? '60dvh' : undefined,
         backgroundColor: '#000000',
         borderRadius: '28px',
-        border: '3px solid #0d47a1',
+        border: `3px solid ${VIDEO_ACCENT}`,
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         cursor: 'pointer',
-        boxShadow: '0 0 25px rgba(13, 71, 161, 0.35), inset 0 0 15px rgba(13, 71, 161, 0.15)',
+        boxShadow: VIDEO_FRAME_SHADOW,
         boxSizing: 'border-box'
       }}
     >
@@ -167,9 +176,9 @@ export const VideoBox: React.FC<{ src: string; label: string; isCompactView: boo
       {!isPlaying ? (
         <div
           className="sb-detail-play"
-          style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '84px', height: '84px', backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid #0d47a1', boxShadow: '0 0 24px rgba(13, 71, 161, 0.4)', zIndex: 20, pointerEvents: 'none', transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}
+          style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '84px', height: '84px', backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `3px solid ${VIDEO_ACCENT}`, boxShadow: `0 0 24px ${VIDEO_GLOW}`, zIndex: 20, pointerEvents: 'none', transition: 'transform 0.2s ease, box-shadow 0.2s ease' }}
         >
-          <Play style={{ width: '40px', height: '40px', color: '#0d47a1', marginLeft: '6px' }} />
+          <Play style={{ width: '40px', height: '40px', color: VIDEO_ACCENT, marginLeft: '6px' }} />
         </div>
       ) : (
         <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(13,71,161,0.85)', borderRadius: '9999px', padding: '6px 12px', zIndex: 15 }}>
