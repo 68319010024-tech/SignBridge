@@ -1,5 +1,9 @@
 import React from 'react';
 import { ScanFace } from 'lucide-react';
+import { GOLD } from '../common/theme';
+
+// /ai2/ ใช้สีทองแทนสีเหลือง
+const WARNING_COLOR = __SB_RED_THEME__ ? GOLD : '#facc15';
 
 // แถบเตือนซ้อนบนภาพกล้อง เมื่อ backend แจ้งว่าผู้ใช้อยู่ใกล้กล้องเกินไป (too_close)
 // ใกล้เกินไปทำให้มือ/ไหล่หลุดขอบภาพและสัดส่วนต่างจากข้อมูลที่โมเดลเทรนมา จนทายผิดบ่อย
@@ -22,7 +26,7 @@ const TooCloseWarning: React.FC<{ show: boolean }> = ({ show }) => {
         alignItems: 'center',
         gap: '12px',
         padding: '10px 18px 10px 10px',
-        backgroundColor: '#facc15',
+        backgroundColor: WARNING_COLOR,
         color: '#1c1917',
         borderRadius: '16px',
         border: '1px solid rgba(255, 255, 255, 0.45)',
@@ -52,7 +56,7 @@ const TooCloseWarning: React.FC<{ show: boolean }> = ({ show }) => {
           justifyContent: 'center'
         }}
       >
-        <ScanFace style={{ width: '22px', height: '22px', color: '#facc15' }} strokeWidth={2.2} />
+        <ScanFace style={{ width: '22px', height: '22px', color: WARNING_COLOR }} strokeWidth={2.2} />
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>

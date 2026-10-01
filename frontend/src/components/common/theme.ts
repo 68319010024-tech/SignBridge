@@ -17,3 +17,10 @@ export const HERO_CARD_STYLES = `
   @keyframes sb-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
   .sb-hero-bubble { animation: sb-float 6s ease-in-out infinite; }
 `;
+
+// สีทองของเว็บ /ai2/ (ธีมแดง-ทอง) ใช้คู่กับ __SB_RED_THEME__ สำหรับจุดที่ต้องการเน้นเป็นสีทอง
+export const GOLD = '#bc9945';
+export const GOLD_GRADIENT = 'linear-gradient(135deg, #9c7c32 0%, #bc9945 55%, #d2b673 100%)';
+export const GOLD_GLOW = 'rgba(188, 153, 69, 0.55)';
+// แถบหัวเว็บ /ai2/: ไล่เฉดทองแบบเดียวกับแถบน้ำเงินของ /ai/ (เข้ม → เข้มกว่า → กลาง → อ่อน → อ่อนสุด)
+export const GOLD_TOPBAR_GRADIENT = 'linear-gradient(120deg, #a5852f 0%, #8c6f28 28%, #bc9945 55%, #d4b977 82%, #e2cd98 100%)';

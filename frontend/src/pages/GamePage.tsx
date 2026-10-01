@@ -28,7 +28,7 @@ import DetectionStatusBox, { resolveDetectionStatus, describeStatus } from '../c
 import CameraControlBox from '../components/webcam/CameraControlBox';
 import ResultPopup from '../components/game/ResultPopup';
 import { BoxHeader, homeCardStyle, homeWatermarkStyle } from '../components/common/BoxHeader';
-import { BLUE_GRADIENT } from '../components/common/theme';
+import { BLUE_GRADIENT, GOLD, GOLD_GLOW } from '../components/common/theme';
 
 const WS_URL = resolveWsUrl();
 const FRAME_SEND_INTERVAL_MS = 100;
@@ -798,12 +798,12 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
           ? '4px solid #10b981'
           : lastResultStatus === 'wrong'
           ? '4px solid #ef4444'
-          : '3px solid #0d47a1',
+          : __SB_RED_THEME__ ? `3px solid ${GOLD}` : '3px solid #0d47a1',
         boxShadow: lastResultStatus === 'correct'
           ? '0 0 30px rgba(16, 185, 129, 0.8)'
           : lastResultStatus === 'wrong'
           ? '0 0 30px rgba(239, 68, 68, 0.8)'
-          : '0 0 20px rgba(13, 71, 161, 0.3)',
+          : __SB_RED_THEME__ ? `0 0 20px ${GOLD_GLOW}` : '0 0 20px rgba(13, 71, 161, 0.3)',
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
@@ -1274,7 +1274,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
         icon={Camera}
         label={isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
         active
-        variant={isCameraOn ? 'default' : 'danger'}
+        variant={isCameraOn ? 'default' : __SB_RED_THEME__ ? 'gold' : 'danger'}
         onClick={toggleCamera}
         slim
       />

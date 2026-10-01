@@ -1,7 +1,7 @@
 import React from 'react';
 import { Camera, RefreshCw, CloudFog, Bone } from 'lucide-react';
 import { BoxHeader, homeCardStyle, homeWatermarkStyle, homeButtonStyle, homeButtonIconStyle, homeGhostStyle, homeGhostIconStyle } from '../common/BoxHeader';
-import { BLUE_GRADIENT } from '../common/theme';
+import { BLUE_GRADIENT, GOLD_GRADIENT, GOLD_GLOW } from '../common/theme';
 
 interface CameraControlBoxProps {
   isCameraOn: boolean;
@@ -42,9 +42,10 @@ export const CameraControlBox: React.FC<CameraControlBoxProps> = ({
       style={{
         ...homeButtonStyle,
         cursor: 'pointer',
-        background: isCameraOn ? BLUE_GRADIENT : 'linear-gradient(135deg, #b91c1c, #ef4444)',
+        // ตอนกล้องปิด (ปุ่มนี้คือปุ่มเปิดกล้อง) /ai2/ ใช้สีทองแทนสีแดง
+        background: isCameraOn ? BLUE_GRADIENT : __SB_RED_THEME__ ? GOLD_GRADIENT : 'linear-gradient(135deg, #b91c1c, #ef4444)',
         color: '#ffffff',
-        boxShadow: isCameraOn ? '0 8px 18px -8px rgba(22,98,196,0.6)' : '0 8px 18px -8px rgba(220,38,38,0.6)'
+        boxShadow: isCameraOn ? '0 8px 18px -8px rgba(22,98,196,0.6)' : `0 8px 18px -8px ${__SB_RED_THEME__ ? GOLD_GLOW : 'rgba(220,38,38,0.6)'}`
       }}
     >
       <span style={{ ...homeButtonIconStyle, backgroundColor: 'rgba(255,255,255,0.22)' }}>

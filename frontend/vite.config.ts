@@ -1,4 +1,6 @@
 import { defineConfig, type Plugin } from 'vite'; import react from '@vitejs/plugin-react';
+import { existsSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 // ธีมสีแบบเลือกตอน build: ตั้ง SB_THEME=red ตอน build จะได้เว็บธีมแดง-ขาว-ทอง
 // (#C3002F + #BC9945) สำหรับ /ai2/ — ถ้าไม่ตั้ง จะได้ธีมน้ำเงิน-ขาวเดิมของ /ai/
@@ -58,7 +60,36 @@ function themePlugin(theme: string | undefined): Plugin {
   };
 }
 
+// โลโก้บน header ของ /ai2/: วางไฟล์รูปไว้ใน src/assets/header-logos/ แล้วจะขึ้นเรียงตามชื่อไฟล์
+// (เช่น 1-xxx.png, 2-xxx.png, 3-xxx.png) แทนไอคอนรูปมือ — ถ้าโฟลเดอร์ว่าง หรือเป็นธีมเดิม
+// จะได้รายการว่าง แล้วหน้าเว็บกลับไปใช้ไอคอนรูปมือตามเดิม
+const HEADER_LOGO_DIR = fileURLToPath(new URL('./src/assets/header-logos/', import.meta.url));
+const HEADER_LOGO_ID = 'virtual:sb-header-logos';
+
+function headerLogosPlugin(theme: string | undefined): Plugin {
+  return {
+    name: 'signbridge-header-logos',
+    resolveId(id) {
+      return id === HEADER_LOGO_ID ? '\0' + HEADER_LOGO_ID : null;
+    },
+    load(id) {
+      if (id !== '\0' + HEADER_LOGO_ID) return null;
+      const files = theme === 'red' && existsSync(HEADER_LOGO_DIR)
+        ? readdirSync(HEADER_LOGO_DIR).filter((f) => /\.(png|jpe?g|svg|webp)$/i.test(f)).sort()
+        : [];
+      const imports = files.map((f, i) => `import logo${i} from '/src/assets/header-logos/${f}';`).join('\n');
+      return `${imports}\nexport default [${files.map((_, i) => `logo${i}`).join(', ')}];`;
+    },
+  };
+}
+
 // base: './' (relative) ทำให้ build เดียวกันนี้ใช้ได้ทั้งตอนรันที่ root
 // (localhost:8080 ตอน dev/ทดสอบบนโน้ตบุ๊ค) และตอนถูกเสิร์ฟใต้ path ย่อยอย่าง
 // /ai/ หรือ /ai2/ บนเซิร์ฟเวอร์ของโรงเรียน โดยไม่ต้อง build แยกสองรอบ
-export default defineConfig({ base: './', plugins: [themePlugin(process.env.SB_THEME), react()] });
+// __SB_RED_THEME__ ใช้ในโค้ดสำหรับจุดที่ /ai2/ ต่างจากการแทนสีตรงๆ (เช่น สีทองเฉพาะบางปุ่ม)
+// ค่าเป็น true/false ตายตัวตอน build ฝั่งที่ไม่ได้ใช้จึงถูกตัดทิ้งไปจากไฟล์ที่ build ออกมา
+export default defineConfig({
+  base: './',
+  define: { __SB_RED_THEME__: JSON.stringify(process.env.SB_THEME === 'red') },
+  plugins: [themePlugin(process.env.SB_THEME), headerLogosPlugin(process.env.SB_THEME), react()],
+});

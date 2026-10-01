@@ -1,4 +1,5 @@
 import React from 'react';
+import { GOLD_GRADIENT } from './theme';
 
 // ปุ่มควบคุมแบบไอคอนย่อสำหรับจอมือถือ/แท็บเล็ต (แทนการ์ดขนาดใหญ่ที่ใช้บนจอ desktop
 // ซึ่งเบียดกันจนใช้งานไม่ได้บนจอแคบ) — ใช้ร่วมกันทั้งหน้า Student และหน้าเกมส์
@@ -7,7 +8,8 @@ export const MobileControlButton: React.FC<{
   label: string;
   active?: boolean;
   disabled?: boolean;
-  variant?: 'default' | 'danger' | 'success';
+  // gold: ใช้เฉพาะเว็บ /ai2/ (ธีมแดง-ทอง)
+  variant?: 'default' | 'danger' | 'success' | 'gold';
   onClick: () => void;
   // วางหลายปุ่มในแถวเดียว (หรือในตาราง) ได้ — ไม่บังคับความกว้างขั้นต่ำ 92px ที่ทำให้ปุ่มตกแถว
   slim?: boolean;
@@ -17,7 +19,9 @@ export const MobileControlButton: React.FC<{
       ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
       : variant === 'success'
         ? 'linear-gradient(135deg, #16a34a, #15803d)'
-        : 'linear-gradient(135deg, #0d47a1, #1662c4)';
+        : __SB_RED_THEME__ && variant === 'gold'
+          ? GOLD_GRADIENT
+          : 'linear-gradient(135deg, #0d47a1, #1662c4)';
 
   return (
     <button
