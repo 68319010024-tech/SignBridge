@@ -27,7 +27,7 @@ import { drawBlurredImage } from '../components/webcam/drawBlurredImage';
 import DetectionStatusBox, { resolveDetectionStatus, describeStatus } from '../components/webcam/DetectionStatusBox';
 import CameraControlBox from '../components/webcam/CameraControlBox';
 import ResultPopup from '../components/game/ResultPopup';
-import { BoxHeader, homeCardStyle, homeWatermarkStyle } from '../components/common/BoxHeader';
+import { BoxHeader, homeCardStyle, homeWatermarkStyle, GHOST_HOVER_BG } from '../components/common/BoxHeader';
 import { BLUE_GRADIENT, GOLD, GOLD_GLOW } from '../components/common/theme';
 
 const WS_URL = resolveWsUrl();
@@ -1275,7 +1275,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
         icon={Camera}
         label={isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
         active
-        variant={__SB_RED_THEME__ ? 'gold' : isCameraOn ? 'default' : 'danger'}
+        variant={isCameraOn ? (__SB_RED_THEME__ ? 'gold' : 'default') : 'danger'}
         onClick={toggleCamera}
         slim
       />
@@ -1320,7 +1320,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
         .sb-primary-btn { transition: filter 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease; }
         .sb-primary-btn:hover { filter: brightness(1.07); box-shadow: 0 6px 16px rgba(13,71,161,0.3); }
         .sb-ghost-btn { transition: background-color 0.2s ease, box-shadow 0.2s ease; }
-        .sb-ghost-btn:not(:disabled):hover { background-color: #eef4fc !important; }
+        .sb-ghost-btn:not(:disabled):hover { background-color: ${GHOST_HOVER_BG} !important; }
         .sb-result-btn:hover { filter: brightness(1.08); box-shadow: 0 8px 22px rgba(13, 71, 161, 0.4) !important; }
       `}</style>
 

@@ -37,7 +37,7 @@ import { useIsMobileView, useIsShortView, useIsTabletPortrait, useIsTabletLandsc
 import { MobileControlButton } from '../components/common/MobileControlButton';
 import TooCloseWarning from '../components/webcam/TooCloseWarning';
 import { drawBlurredImage } from '../components/webcam/drawBlurredImage';
-import { BoxHeader, homeCardStyle, homeWatermarkStyle, homeButtonStyle, homeButtonIconStyle, homeGhostStyle, homeGhostIconStyle } from '../components/common/BoxHeader';
+import { BoxHeader, homeCardStyle, homeWatermarkStyle, homeButtonStyle, homeButtonIconStyle, homeGhostStyle, homeGhostIconStyle, GHOST_ICON_COLOR, GHOST_HOVER_BG } from '../components/common/BoxHeader';
 import CameraControlBox from '../components/webcam/CameraControlBox';
 import { BLUE_GRADIENT, GOLD, GOLD_GRADIENT, GOLD_GLOW, RED_TOPBAR_GRADIENT } from '../components/common/theme';
 import headerLogos from 'virtual:sb-header-logos';
@@ -591,12 +591,10 @@ export const StudentDashboard: React.FC = () => {
         flex: 1,
         backgroundColor: '#000000',
         borderRadius: '32px',
-        // /ai2/ ใช้ขอบสีทองทั้งตอนเปิดและปิดกล้อง
-        border: __SB_RED_THEME__ ? `3px solid ${GOLD}` : isCameraOn ? '3px solid #0d47a1' : '3px solid #ef4444',
-        boxShadow: __SB_RED_THEME__
-          ? `0 0 20px ${GOLD_GLOW}`
-          : isCameraOn
-          ? '0 0 20px rgba(13, 71, 161, 0.3)'
+        // กล้องเปิด: /ai2/ ใช้ขอบสีทองแทนสีหลัก / กล้องปิด: ขอบแดงทั้งสองเว็บ
+        border: isCameraOn ? (__SB_RED_THEME__ ? `3px solid ${GOLD}` : '3px solid #0d47a1') : '3px solid #ef4444',
+        boxShadow: isCameraOn
+          ? (__SB_RED_THEME__ ? `0 0 20px ${GOLD_GLOW}` : '0 0 20px rgba(13, 71, 161, 0.3)')
           : '0 0 20px rgba(239, 68, 68, 0.5)',
         position: 'relative',
         overflow: 'hidden',
@@ -823,7 +821,7 @@ export const StudentDashboard: React.FC = () => {
         }}
       >
         <span style={homeGhostIconStyle}>
-          <RotateCcw style={{ width: '13px', height: '13px', color: '#0d47a1' }} />
+          <RotateCcw style={{ width: '13px', height: '13px', color: GHOST_ICON_COLOR }} />
         </span>
         {sentenceButtonsInRow ? 'ล้าง' : 'ล้างประโยค'}
       </button>
@@ -898,7 +896,7 @@ export const StudentDashboard: React.FC = () => {
         icon={Camera}
         label={isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
         active
-        variant={__SB_RED_THEME__ ? 'gold' : isCameraOn ? 'default' : 'danger'}
+        variant={isCameraOn ? (__SB_RED_THEME__ ? 'gold' : 'default') : 'danger'}
         onClick={toggleCamera}
       />
       <MobileControlButton
@@ -972,7 +970,7 @@ export const StudentDashboard: React.FC = () => {
         .sb-primary-btn:active { transform: scale(0.98); }
 
         .sb-ghost-btn { transition: background-color 0.2s ease, box-shadow 0.2s ease; }
-        .sb-ghost-btn:not(:disabled):hover { background-color: #eef4fc !important; }
+        .sb-ghost-btn:not(:disabled):hover { background-color: ${GHOST_HOVER_BG} !important; }
 
         .sb-scroll::-webkit-scrollbar { width: 8px; }
         .sb-scroll::-webkit-scrollbar-track { background: transparent; }

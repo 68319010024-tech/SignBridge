@@ -1,5 +1,5 @@
 import React from 'react';
-import { BLUE_GRADIENT } from './theme';
+import { BLUE_GRADIENT, GOLD, GOLD_TINT, GOLD_TINT_HOVER, GOLD_TINT_BORDER, GOLD_SOFT } from './theme';
 
 // หัวกล่องในหน้าหลัก/หน้าทบทวน: ไอคอนสีขาวในสี่เหลี่ยมมนไล่สีน้ำเงิน + ชื่อกล่อง
 export const BoxHeader: React.FC<{
@@ -59,17 +59,21 @@ export const homeButtonIconStyle: React.CSSProperties = {
   justifyContent: 'center',
   flexShrink: 0
 };
+// ปุ่มรอง (สลับกล้อง, สวิตช์, ล้างประโยค) — /ai2/ ใช้โทนทอง
 export const homeGhostStyle: React.CSSProperties = {
   padding: '8px 12px',
-  backgroundColor: '#f4f8fd',
-  border: '1px solid #e3ecf7',
+  backgroundColor: __SB_RED_THEME__ ? GOLD_TINT : '#f4f8fd',
+  border: `1px solid ${__SB_RED_THEME__ ? GOLD_TINT_BORDER : '#e3ecf7'}`,
   color: '#334155'
 };
 export const homeGhostIconStyle: React.CSSProperties = {
   ...homeButtonIconStyle,
   width: '22px',
   height: '22px',
-  backgroundColor: '#e8f1fd'
+  backgroundColor: __SB_RED_THEME__ ? GOLD_SOFT : '#e8f1fd'
 };
+// สีไอคอนในปุ่มรอง และพื้นปุ่มรองตอน hover
+export const GHOST_ICON_COLOR = __SB_RED_THEME__ ? GOLD : '#0d47a1';
+export const GHOST_HOVER_BG = __SB_RED_THEME__ ? GOLD_TINT_HOVER : '#eef4fc';
 
 export default BoxHeader;

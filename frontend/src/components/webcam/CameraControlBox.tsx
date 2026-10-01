@@ -1,6 +1,6 @@
 import React from 'react';
 import { Camera, RefreshCw, CloudFog, Bone } from 'lucide-react';
-import { BoxHeader, homeCardStyle, homeWatermarkStyle, homeButtonStyle, homeButtonIconStyle, homeGhostStyle, homeGhostIconStyle } from '../common/BoxHeader';
+import { BoxHeader, homeCardStyle, homeWatermarkStyle, homeButtonStyle, homeButtonIconStyle, homeGhostStyle, homeGhostIconStyle, GHOST_ICON_COLOR } from '../common/BoxHeader';
 import { BLUE_GRADIENT, GOLD_GRADIENT, GOLD_GLOW } from '../common/theme';
 
 interface CameraControlBoxProps {
@@ -42,10 +42,10 @@ export const CameraControlBox: React.FC<CameraControlBoxProps> = ({
       style={{
         ...homeButtonStyle,
         cursor: 'pointer',
-        // /ai2/ ใช้สีทองทั้งตอนเปิดและปิดกล้อง
-        background: __SB_RED_THEME__ ? GOLD_GRADIENT : isCameraOn ? BLUE_GRADIENT : 'linear-gradient(135deg, #b91c1c, #ef4444)',
+        // กล้องเปิด: /ai2/ ใช้สีทองแทนสีหลัก / กล้องปิด: สีแดงทั้งสองเว็บ (แบบเดียวกับปุ่มแปลผลประโยค)
+        background: isCameraOn ? (__SB_RED_THEME__ ? GOLD_GRADIENT : BLUE_GRADIENT) : 'linear-gradient(135deg, #b91c1c, #ef4444)',
         color: '#ffffff',
-        boxShadow: __SB_RED_THEME__ ? `0 8px 18px -8px ${GOLD_GLOW}` : isCameraOn ? '0 8px 18px -8px rgba(22,98,196,0.6)' : '0 8px 18px -8px rgba(220,38,38,0.6)'
+        boxShadow: isCameraOn ? `0 8px 18px -8px ${__SB_RED_THEME__ ? GOLD_GLOW : 'rgba(22,98,196,0.6)'}` : '0 8px 18px -8px rgba(220,38,38,0.6)'
       }}
     >
       <span style={{ ...homeButtonIconStyle, backgroundColor: 'rgba(255,255,255,0.22)' }}>
@@ -67,7 +67,7 @@ export const CameraControlBox: React.FC<CameraControlBoxProps> = ({
       }}
     >
       <span style={homeGhostIconStyle}>
-        <RefreshCw style={{ width: '12px', height: '12px', color: '#0d47a1' }} />
+        <RefreshCw style={{ width: '12px', height: '12px', color: GHOST_ICON_COLOR }} />
       </span>
       สลับกล้อง
     </button>
@@ -92,11 +92,11 @@ export const CameraControlBox: React.FC<CameraControlBoxProps> = ({
         }}
       >
         <span style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-          <t.icon style={{ width: '14px', height: '14px', color: t.on ? '#0d47a1' : '#64748b' }} />
+          <t.icon style={{ width: '14px', height: '14px', color: t.on ? GHOST_ICON_COLOR : '#64748b' }} />
           {t.label}
         </span>
         {/* สวิตช์เปิด/ปิด */}
-        <span style={{ width: '32px', height: '18px', borderRadius: '9999px', padding: '2px', background: t.on ? BLUE_GRADIENT : '#cbd5e1', display: 'flex', alignItems: 'center', boxSizing: 'border-box', transition: 'background 0.3s', flexShrink: 0 }}>
+        <span style={{ width: '32px', height: '18px', borderRadius: '9999px', padding: '2px', background: t.on ? (__SB_RED_THEME__ ? GOLD_GRADIENT : BLUE_GRADIENT) : '#cbd5e1', display: 'flex', alignItems: 'center', boxSizing: 'border-box', transition: 'background 0.3s', flexShrink: 0 }}>
           <span style={{ width: '14px', height: '14px', borderRadius: '50%', backgroundColor: '#ffffff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transform: t.on ? 'translateX(14px)' : 'translateX(0)', transition: 'transform 0.3s' }} />
         </span>
       </button>

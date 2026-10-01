@@ -24,3 +24,9 @@ export const GOLD_GRADIENT = 'linear-gradient(135deg, #9c7c32 0%, #bc9945 55%, #
 export const GOLD_GLOW = 'rgba(188, 153, 69, 0.55)';
 // แถบหัวเว็บ /ai2/: ไล่เฉดแดง #C3002F แบบเดียวกับแถบน้ำเงินของ /ai/ (เข้ม → เข้มกว่า → กลาง → อ่อน → อ่อนสุด)
 export const RED_TOPBAR_GRADIENT = 'linear-gradient(120deg, #c3002f 0%, #8f0022 28%, #b0002a 55%, #e2486a 82%, #ef7f97 100%)';
+// ปุ่มรอง/สวิตช์/ป้ายสถานะในกล่องกล้องของ /ai2/: พื้นทองอ่อน + ตัวอักษรทองเข้ม (ทอง #BC9945 บนพื้นอ่อนอ่านยาก)
+export const GOLD_TINT = '#fbf6ea';
+export const GOLD_TINT_HOVER = '#f6edd6';
+export const GOLD_TINT_BORDER = '#efe2c2';
+export const GOLD_SOFT = '#f4ecd6';
+export const GOLD_TEXT = '#9c7c32';

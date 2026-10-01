@@ -1,5 +1,6 @@
 import React from 'react';
 import { BoxHeader, homeCardStyle } from '../common/BoxHeader';
+import { GOLD_SOFT, GOLD_TEXT } from '../common/theme';
 import { Radar, CameraOff, WifiOff, ScanFace, CheckCircle2, CircleAlert, Hand, Loader, XCircle, Play } from 'lucide-react';
 
 // สถานะของระบบตรวจจับ ใช้ทั้งหน้าหลักและหน้าทบทวนไวยากรณ์
@@ -27,8 +28,9 @@ const LOOK: Record<DetectionStatus['kind'], { icon: IconType; color: string; bg:
   'too-close': { icon: ScanFace, color: '#a16207', bg: '#fef9c3', text: 'อยู่ใกล้กล้องเกินไป' },
   'detected': { icon: CheckCircle2, color: '#16a34a', bg: '#dcfce7', text: 'ตรวจจับสำเร็จ' },
   'unsure': { icon: CircleAlert, color: '#dc2626', bg: '#fee2e2', text: 'ไม่ชัดเจน ลองใหม่' },
-  'reading': { icon: Loader, color: '#1662c4', bg: '#e8f1fd', text: 'กำลังอ่านท่าทาง...' },
-  'ready': { icon: Hand, color: '#0d47a1', bg: '#e8f1fd', text: 'พร้อม รอภาษามือ' },
+  // /ai2/ ใช้โทนทอง
+  'reading': { icon: Loader, color: __SB_RED_THEME__ ? GOLD_TEXT : '#1662c4', bg: __SB_RED_THEME__ ? GOLD_SOFT : '#e8f1fd', text: 'กำลังอ่านท่าทาง...' },
+  'ready': { icon: Hand, color: __SB_RED_THEME__ ? GOLD_TEXT : '#0d47a1', bg: __SB_RED_THEME__ ? GOLD_SOFT : '#e8f1fd', text: 'พร้อม รอภาษามือ' },
 };
 
 // ข้อความ/สี/ไอคอนของสถานะ — ใช้ร่วมกับช่องสถานะแบบย่อบนมือถือด้วย
