@@ -868,7 +868,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
       {isCameraOn && !isTimerRunning && (
         <div style={{ position: 'absolute', backgroundColor: 'rgba(255,255,255,0.94)', padding: '16px 28px', borderRadius: '24px', border: '2px solid #0d47a1', textAlign: 'center', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', zIndex: 10 }}>
           <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#0d47a1', margin: 0 }}>
-            กดปุ่ม START สีน้ำเงิน{isPhonePortrait ? 'ด้านล่าง' : 'ทางขวามือ'}เพื่อเริ่มทบทวน!
+            กดปุ่ม START {__SB_RED_THEME__ ? 'สีแดง' : 'สีน้ำเงิน'}{isPhonePortrait ? 'ด้านล่าง' : 'ทางขวามือ'}เพื่อเริ่มทบทวน!
           </p>
         </div>
       )}
@@ -1100,13 +1100,14 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
         return (
           <div style={{ position: 'relative', alignSelf: 'center', width: `${ring}px`, height: `${ring}px`, margin: isTabletPortrait ? 'auto 0' : undefined }}>
             <svg width={ring} height={ring} style={{ transform: 'rotate(-90deg)' }}>
-              <circle cx={ring / 2} cy={ring / 2} r={radius} fill="none" stroke="#e8f1fd" strokeWidth={stroke} />
+              {/* /ai2/ ใช้วงสีทอง (ยังเป็นแดงเมื่อเหลือ ≤ 10 วินาที) */}
+              <circle cx={ring / 2} cy={ring / 2} r={radius} fill="none" stroke={__SB_RED_THEME__ ? '#f4ecd6' : '#e8f1fd'} strokeWidth={stroke} />
               <circle
                 cx={ring / 2}
                 cy={ring / 2}
                 r={radius}
                 fill="none"
-                stroke={danger ? '#ef4444' : '#1662c4'}
+                stroke={danger ? '#ef4444' : __SB_RED_THEME__ ? GOLD : '#1662c4'}
                 strokeWidth={stroke}
                 strokeLinecap="round"
                 strokeDasharray={circumference}
@@ -1274,7 +1275,7 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
         icon={Camera}
         label={isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
         active
-        variant={isCameraOn ? 'default' : __SB_RED_THEME__ ? 'gold' : 'danger'}
+        variant={__SB_RED_THEME__ ? 'gold' : isCameraOn ? 'default' : 'danger'}
         onClick={toggleCamera}
         slim
       />

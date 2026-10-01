@@ -14,27 +14,36 @@
 #   -> Deploy the stack
 #
 # จากนั้นไปตั้งค่าใน NPM: Hosts -> Proxy Hosts -> แก้ host ของ webapp.htc.ac.th
-# (ห้ามลบของเดิม) -> แท็บ Custom Locations -> Add location:
-#   Define location: /ai/
-#   Forward Hostname/IP: signbridge-frontend
-#   Forward Port: 80
+# (ห้ามลบของเดิม) -> แท็บ Advanced -> ต่อท้าย Custom Nginx Configuration ด้วย:
 #
-# แล้ว Add location อีกอันสำหรับ ai-engine (WebSocket):
-#   Define location: /ai/ws/
-#   Forward Hostname/IP: signbridge-ai-engine
-#   Forward Port: 8000
-#   กด gear icon ของ location นี้ ใส่ Custom Nginx Configuration:
-#     proxy_http_version 1.1;
-#     proxy_set_header Upgrade $http_upgrade;
-#     proxy_set_header Connection "upgrade";
-#   (ทำแบบนี้เพราะ toggle "Websockets Support" ที่แท็บ Details ของ NPM ใช้ได้แค่กับ
-#   location หลักของ host เท่านั้น ไม่ครอบคลุม Custom Locations)
+#   location /ai/ws/ {
+#       resolver 127.0.0.11 valid=10s ipv6=off;
+#       set $sb_engine signbridge-ai-engine;
+#       proxy_pass http://$sb_engine:8000;
+#       proxy_http_version 1.1;
+#       proxy_set_header Upgrade $http_upgrade;
+#       proxy_set_header Connection "upgrade";
+#       proxy_set_header Host $host;
+#   }
+#   location /ai/ {
+#       resolver 127.0.0.11 valid=10s ipv6=off;
+#       set $sb_ai signbridge-frontend;
+#       proxy_pass http://$sb_ai:80;
+#       proxy_set_header Host $host;
+#   }
+#   location /ai2/ {
+#       resolver 127.0.0.11 valid=10s ipv6=off;
+#       set $sb_ai2 signbridge-frontend-ai2;
+#       proxy_pass http://$sb_ai2:80;
+#       proxy_set_header Host $host;
+#   }
 #
-# เว็บชุดที่สอง /ai2/ (ธีมแดง-ทอง, frontend-ai2 ด้านล่าง) ใช้ ai-engine ตัวเดียวกัน
-# ผ่าน /ai/ws/ เดิม จึงเพิ่มใน NPM แค่ Custom Location เดียว:
-#   Define location: /ai2/
-#   Forward Hostname/IP: signbridge-frontend-ai2
-#   Forward Port: 80
+# ทำไมไม่ใช้แท็บ Custom Locations: NPM เขียน proxy_pass แบบชื่อตรงๆ ซึ่ง nginx แปลงชื่อเป็น IP
+# แค่ครั้งเดียวตอนโหลด config แต่ทุกครั้งที่ redeploy stack นี้ container จะได้ IP ใหม่
+# NPM จึงส่งไปผิดตัว (เคยเกิด /ai2/ ได้หน้าธีม /ai/ และ /ai/ 502) จนกว่าจะกด Save ใน NPM ใหม่
+# แบบข้างบนใช้ตัวแปร + resolver ของ Docker (127.0.0.11) nginx จึงถามหา IP ใหม่ทุก 10 วินาที
+# ถ้าเคยตั้งไว้ใน Custom Locations (/ai/, /ai/ws/, /ai2/) ต้องลบออกก่อน ไม่งั้นชื่อ location ซ้ำกัน
+# ทั้ง 2 เว็บ (/ai/ และ /ai2/) ใช้ ai-engine ตัวเดียวกันผ่าน /ai/ws/
 
 services:
   frontend:

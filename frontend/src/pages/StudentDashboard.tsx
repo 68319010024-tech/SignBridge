@@ -898,7 +898,7 @@ export const StudentDashboard: React.FC = () => {
         icon={Camera}
         label={isCameraOn ? 'ปิดกล้อง' : 'เปิดกล้อง'}
         active
-        variant={isCameraOn ? 'default' : __SB_RED_THEME__ ? 'gold' : 'danger'}
+        variant={__SB_RED_THEME__ ? 'gold' : isCameraOn ? 'default' : 'danger'}
         onClick={toggleCamera}
       />
       <MobileControlButton
