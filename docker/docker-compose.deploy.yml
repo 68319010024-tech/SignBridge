@@ -29,6 +29,12 @@
 #     proxy_set_header Connection "upgrade";
 #   (ทำแบบนี้เพราะ toggle "Websockets Support" ที่แท็บ Details ของ NPM ใช้ได้แค่กับ
 #   location หลักของ host เท่านั้น ไม่ครอบคลุม Custom Locations)
+#
+# เว็บชุดที่สอง /ai2/ (ธีมแดง-ทอง, frontend-ai2 ด้านล่าง) ใช้ ai-engine ตัวเดียวกัน
+# ผ่าน /ai/ws/ เดิม จึงเพิ่มใน NPM แค่ Custom Location เดียว:
+#   Define location: /ai2/
+#   Forward Hostname/IP: signbridge-frontend-ai2
+#   Forward Port: 80
 
 services:
   frontend:
@@ -36,6 +42,17 @@ services:
       context: ../frontend
       dockerfile: Dockerfile
     container_name: signbridge-frontend
+    restart: unless-stopped
+    networks:
+      - multi-host_default
+
+  frontend-ai2:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        SB_THEME: red
+    container_name: signbridge-frontend-ai2
     restart: unless-stopped
     networks:
       - multi-host_default
