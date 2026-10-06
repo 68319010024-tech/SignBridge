@@ -24,6 +24,9 @@ import { PageBadge } from '../components/common/PageBadge';
 import { MobileControlButton } from '../components/common/MobileControlButton';
 import TooCloseWarning from '../components/webcam/TooCloseWarning';
 import { drawBlurredImage } from '../components/webcam/drawBlurredImage';
+import { drawSkeletonFrame } from '../components/webcam/drawSkeletonFrame';
+import { createSelfieSegmentation } from '../components/webcam/selfieSegmentation';
+import { IS_LOW_POWER_DEVICE } from '../utils/lowPowerDevice';
 import DetectionStatusBox, { resolveDetectionStatus, describeStatus } from '../components/webcam/DetectionStatusBox';
 import CameraControlBox from '../components/webcam/CameraControlBox';
 import ResultPopup from '../components/game/ResultPopup';
@@ -320,7 +323,8 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
   // (ซึ่งเป็นภาพดิบไม่กลับด้านเสมอ) ป้องกันปัญหาภาพสลับด้านกันเวลาสลับโหมด
   const [isMirrored, setIsMirrored] = useState<boolean>(false);
   const [isShowSkeleton, setIsShowSkeleton] = useState<boolean>(false);
-  const [skeletonFrame, setSkeletonFrame] = useState<string | null>(null);
+  // ได้ภาพโครงกระดูกภาพแรกแล้วหรือยัง (ตัวภาพวาดลง skeletonCanvasRef โดยตรง ไม่ผ่าน state)
+  const [hasSkeletonFrame, setHasSkeletonFrame] = useState<boolean>(false);
 
   const [wsStatus, setWsStatus] = useState<WsStatus>('connecting');
 
@@ -342,8 +346,11 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sendCanvasRef = useRef<HTMLCanvasElement>(null);
+  const skeletonCanvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const selfieSegRef = useRef<any>(null);
+  const isSegLoadingRef = useRef(false);
+  const isMountedRef = useRef(true);
   const animFrameId = useRef<number | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -368,7 +375,11 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
 
   useEffect(() => {
     isShowSkeletonRef.current = isShowSkeleton;
-    if (!isShowSkeleton) setSkeletonFrame(null);
+    if (!isShowSkeleton) {
+      setHasSkeletonFrame(false);
+      const sk = skeletonCanvasRef.current;
+      sk?.getContext('2d')?.clearRect(0, 0, sk.width, sk.height);
+    }
   }, [isShowSkeleton]);
 
   useEffect(() => {
@@ -388,7 +399,8 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
     stopCamera();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 } },
+        // โหมดเบา (Pi): ขอ 30fps ด้วย กล้อง USB อย่าง C270 จะได้ส่งแบบ MJPEG แทน YUYV ที่ 720p ได้แค่ราว 7–10fps
+        video: { facingMode: mode, width: { ideal: 1280 }, height: { ideal: 720 }, ...(IS_LOW_POWER_DEVICE ? { frameRate: { ideal: 30 } } : {}) },
         audio: false
       });
       streamRef.current = stream;
@@ -441,76 +453,70 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
     }
   };
 
-  // โหลด MediaPipe Selfie Segmentation
-  useEffect(() => {
-    let isMounted = true;
+  // วาดผลจาก Selfie Segmentation (ตัดพื้นหลัง) ลง canvas — อ่านค่าล่าสุดผ่าน ref เพราะโมเดลถูกสร้างครั้งเดียว
+  const drawSegmentationResults = (results: any) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    const loadScript = (src: string) => {
-      return new Promise((resolve, reject) => {
-        if (document.querySelector(`script[src="${src}"]`)) {
-          resolve(true);
+    if (canvas.width !== results.image.width) canvas.width = results.image.width;
+    if (canvas.height !== results.image.height) canvas.height = results.image.height;
+
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // จัดการการกลับด้านกล้องหน้า (Mirror Effect)
+    if (isMirroredRef.current) {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+
+    if (isBlurBgRef.current) {
+      // 1. วาด Mask ตัวคน
+      ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
+
+      // 2. ตัดเฉพาะตัวคนให้ชัด 100%
+      ctx.globalCompositeOperation = 'source-in';
+      ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+
+      // 3. ฉากหลังเบลอ 20px (Safari ไม่รองรับ ctx.filter — ใช้ drawBlurredImage ที่มีวิธีสำรอง)
+      ctx.globalCompositeOperation = 'destination-over';
+      drawBlurredImage(ctx, results.image, canvas.width, canvas.height, 20);
+    } else {
+      ctx.filter = 'none';
+      ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+    }
+
+    ctx.restore();
+  };
+
+  // โหลด MediaPipe ตอนกดเปิดเบลอครั้งแรก แล้วใช้ตัวเดิมต่อไป (ระหว่างโหลด loop จะวาดภาพแบบสำรองแทน)
+  useEffect(() => {
+    if (!isBlurBg || selfieSegRef.current || isSegLoadingRef.current) return;
+    isSegLoadingRef.current = true;
+    createSelfieSegmentation(drawSegmentationResults)
+      .then((seg) => {
+        if (!isMountedRef.current) {
+          seg.close();
           return;
         }
-        const script = document.createElement('script');
-        script.src = src;
-        script.crossOrigin = 'anonymous';
-        script.onload = () => resolve(true);
-        script.onerror = () => reject(new Error(`Failed to load: ${src}`));
-        document.head.appendChild(script);
-      });
-    };
-
-    loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js')
-      .then(() => {
-        if (!isMounted || typeof (window as any).SelfieSegmentation === 'undefined') return;
-
-        const selfieSegmentation = new (window as any).SelfieSegmentation({
-          locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`,
-        });
-
-        selfieSegmentation.setOptions({ modelSelection: 1 });
-
-        selfieSegmentation.onResults((results: any) => {
-          const canvas = canvasRef.current;
-          if (!canvas) return;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-
-          canvas.width = results.image.width;
-          canvas.height = results.image.height;
-
-          ctx.save();
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-          if (isMirrored) {
-            ctx.translate(canvas.width, 0);
-            ctx.scale(-1, 1);
-          }
-
-          if (isBlurBg) {
-            ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
-            ctx.globalCompositeOperation = 'source-in';
-            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-            ctx.globalCompositeOperation = 'destination-over';
-            // Safari ไม่รองรับ ctx.filter — ใช้ drawBlurredImage ที่มีวิธีสำรอง
-            drawBlurredImage(ctx, results.image, canvas.width, canvas.height, 20);
-          } else {
-            ctx.filter = 'none';
-            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-          }
-
-          ctx.restore();
-        });
-
-        selfieSegRef.current = selfieSegmentation;
+        selfieSegRef.current = seg;
       })
-      .catch((err) => console.error('MediaPipe Load Error:', err));
+      .catch((err) => console.error('MediaPipe Load Error:', err))
+      .finally(() => {
+        isSegLoadingRef.current = false;
+      });
+  }, [isBlurBg]);
 
+  useEffect(() => {
+    isMountedRef.current = true;
     return () => {
-      isMounted = false;
-      if (selfieSegRef.current) selfieSegRef.current.close();
+      isMountedRef.current = false;
+      selfieSegRef.current?.close();
+      selfieSegRef.current = null;
     };
-  }, [isBlurBg, isMirrored]);
+  }, []);
 
   const processSegmentationLoop = async () => {
     const video = videoRef.current;
@@ -525,7 +531,8 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
         } catch (e) {
           drawFallbackVideo(video, canvas);
         }
-      } else {
+      } else if (!IS_LOW_POWER_DEVICE || isBlurBgRef.current) {
+        // โหมดเบาที่ไม่ได้เปิดเบลอ: แสดง <video> ตรง ๆ อยู่แล้ว ไม่ต้องวาดลง canvas
         drawFallbackVideo(video, canvas);
       }
     }
@@ -537,8 +544,9 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // ตั้งขนาดเฉพาะตอนเปลี่ยน (ตั้งทุกเฟรมจะล้างและจองหน่วยความจำ canvas ใหม่ ~60 ครั้ง/วินาที)
+    if (canvas.width !== video.videoWidth) canvas.width = video.videoWidth;
+    if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight;
     ctx.save();
 
     if (isMirroredRef.current) {
@@ -607,8 +615,10 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
         setIsReadingSign(data.is_recording === true);
 
         // ภาพ Skeleton
-        if (isShowSkeletonRef.current && data.frame) {
-          setSkeletonFrame(`data:image/jpeg;base64,${data.frame}`);
+        if (isShowSkeletonRef.current && data.frame && skeletonCanvasRef.current) {
+          drawSkeletonFrame(skeletonCanvasRef.current, data.frame).then((ok) => {
+            if (ok && isShowSkeletonRef.current) setHasSkeletonFrame(true);
+          });
         }
       };
 
@@ -662,11 +672,14 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
       // ย่อให้ด้านยาวไม่เกิน MAX_SEND_DIM (เท่ากับที่ server ย่อก่อนประมวลผลอยู่แล้ว) ภาพที่ AI ได้เท่าเดิม
       // แต่ข้อมูลที่ต้องส่งเหลือไม่ถึงครึ่ง
       const scale = Math.min(1, MAX_SEND_DIM / Math.max(video.videoWidth, video.videoHeight));
-      sendCanvas.width = Math.round(video.videoWidth * scale);
-      sendCanvas.height = Math.round(video.videoHeight * scale);
-      ctx.drawImage(video, 0, 0, sendCanvas.width, sendCanvas.height);
+      const sendW = Math.round(video.videoWidth * scale);
+      const sendH = Math.round(video.videoHeight * scale);
+      if (sendCanvas.width !== sendW) sendCanvas.width = sendW;
+      if (sendCanvas.height !== sendH) sendCanvas.height = sendH;
+      ctx.drawImage(video, 0, 0, sendW, sendH);
 
-      const base64 = sendCanvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+      // โหมดเบา (Pi): 0.8 เท่าหน้าหลัก — เข้ารหัส JPEG เร็วขึ้นและไฟล์เล็กลง
+      const base64 = sendCanvas.toDataURL('image/jpeg', IS_LOW_POWER_DEVICE ? 0.8 : 0.95).split(',')[1];
       if (!base64) return;
 
       socket.send(JSON.stringify({ image: base64, showSkeleton: isShowSkeletonRef.current, page: 'game' }));
@@ -812,7 +825,16 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
         transition: 'border 0.3s ease, box-shadow 0.3s ease'
       }}
     >
-      <video ref={videoRef} autoPlay playsInline muted style={{ display: 'none' }} />
+      {/* โหมดเบา (Pi) ที่ไม่ได้เปิดเบลอ: แสดง <video> ตรง ๆ ให้ GPU วาดเอง แทนการวาดลง canvas ด้วย JS ทุกเฟรม */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        style={IS_LOW_POWER_DEVICE && !isBlurBg && isCameraOn
+          ? { display: 'block', width: '100%', height: '100%', objectFit: 'contain', transform: isMirrored ? 'scaleX(-1)' : 'none' }
+          : { display: 'none' }}
+      />
 
       <canvas
         ref={canvasRef}
@@ -820,28 +842,28 @@ export const GamePage: React.FC<GamePageProps> = ({ onCameraStatusChange }) => {
           width: '100%',
           height: '100%',
           objectFit: 'contain',
-          display: isCameraOn ? 'block' : 'none'
+          display: isCameraOn && !(IS_LOW_POWER_DEVICE && !isBlurBg) ? 'block' : 'none'
         }}
       />
 
       <TooCloseWarning show={isCameraOn && wsStatus === 'connected' && isTooClose} />
 
-      {isCameraOn && isShowSkeleton && skeletonFrame && (
-        <img
-          src={skeletonFrame}
-          alt="โครงกระดูกที่ตรวจจับได้"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            zIndex: 10,
-            pointerEvents: 'none'
-          }}
-        />
-      )}
+      {/* ภาพโครงกระดูก — mount ไว้ตลอดเพื่อให้วาดลงได้ทันทีที่ภาพแรกมาถึง แสดงเมื่อมีภาพแล้ว */}
+      <canvas
+        ref={skeletonCanvasRef}
+        aria-label="โครงกระดูกที่ตรวจจับได้"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          zIndex: 10,
+          pointerEvents: 'none',
+          display: isCameraOn && isShowSkeleton && hasSkeletonFrame ? 'block' : 'none'
+        }}
+      />
 
       {/* MODE + LIVE BADGE */}
       {isCameraOn && (
