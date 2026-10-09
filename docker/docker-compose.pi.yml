@@ -1,0 +1,47 @@
+# SignBridge /ai2/ บน Raspberry Pi 5 — รันทั้งหน้าเว็บและ ai-engine ในตัวเครื่อง ใช้งานได้แม้ไม่มีอินเทอร์เน็ต
+#
+# ไม่เกี่ยวกับเซิร์ฟเวอร์วิทยาลัย (docker-compose.deploy.yml) — https://webapp.htc.ac.th/ai2/ ยังใช้งานได้ตามเดิม
+#
+# เปิดใช้งานบน Pi: http://localhost:8080/ai2/  (Chromium กด F11 หรือ kiosk ให้เต็มจอ 1280x800)
+# หน้าเว็บที่เปิดจาก localhost จะต่อ ai-engine ที่ ws://127.0.0.1:8000 เอง (frontend/src/services/wsConfig.ts)
+#
+# วิธี deploy (ผ่าน Portainer ของ Pi ที่ port 9000):
+#   Portainer -> environment "local" -> Stacks -> Add stack -> Repository
+#   -> Repository URL: (URL ของ repo นี้บน GitHub)
+#   -> Reference: refs/heads/master
+#   -> Compose path: docker/docker-compose.pi.yml
+#   -> Deploy the stack
+# build ครั้งแรกต้องต่ออินเทอร์เน็ต (ดาวน์โหลด image/npm/pip — tensorflow ~250MB) ใช้เวลาราว 15–30 นาที
+# หลังจากนั้นถอดอินเทอร์เน็ตได้ — container ตั้ง restart: unless-stopped เปิดเครื่องใหม่แล้วขึ้นเอง
+#
+# port 80 ของ Pi ใช้โดย nginx_web อยู่แล้ว และ 9000/9443 เป็นของ Portainer จึงใช้ 8080 / 8000
+
+services:
+  frontend-ai2:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        SB_THEME: red
+        # ฟอนต์และโมเดลเบลอพื้นหลังอยู่ในเว็บเอง ไม่โหลดจากอินเทอร์เน็ต
+        SB_OFFLINE: "1"
+    container_name: signbridge-pi-ai2
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+
+  ai-engine:
+    build:
+      context: ../ai-engine
+      dockerfile: Dockerfile
+    container_name: signbridge-pi-ai-engine
+    restart: unless-stopped
+    ports:
+      # เปิดให้เฉพาะเบราว์เซอร์บนตัว Pi เอง
+      - "127.0.0.1:8000:8000"
+    # Pi 5 มี 4 core: แบ่งให้ AI ไม่เกิน 2.5 core ที่เหลือให้เบราว์เซอร์ ไม่งั้นกดเมนู/เลื่อนหน้าจะหน่วง
+    cpus: "2.5"
+    environment:
+      OMP_NUM_THREADS: "2"
+      TF_NUM_INTRAOP_THREADS: "2"
+      TF_NUM_INTEROP_THREADS: "1"

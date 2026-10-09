@@ -39,7 +39,8 @@ import TooCloseWarning from '../components/webcam/TooCloseWarning';
 import { drawBlurredImage } from '../components/webcam/drawBlurredImage';
 import { drawSkeletonFrame } from '../components/webcam/drawSkeletonFrame';
 import { createSelfieSegmentation } from '../components/webcam/selfieSegmentation';
-import { IS_LOW_POWER_DEVICE } from '../utils/lowPowerDevice';
+import { IS_LITE_UI, IS_LOW_POWER_DEVICE } from '../utils/lowPowerDevice';
+import { LiteFrameSender } from '../components/webcam/liteFrameSender';
 import { BoxHeader, homeCardStyle, homeWatermarkStyle, homeButtonStyle, homeButtonIconStyle, homeGhostStyle, homeGhostIconStyle, GHOST_ICON_COLOR, GHOST_HOVER_BG } from '../components/common/BoxHeader';
 import CameraControlBox from '../components/webcam/CameraControlBox';
 import { BLUE_GRADIENT, GOLD, GOLD_GRADIENT, GOLD_GLOW, RED_TOPBAR_GRADIENT } from '../components/common/theme';
@@ -66,6 +67,8 @@ interface PredictionMessage {
   sentence_epoch?: number;
   frame: string | null;
 }
+
+const sameWords = (a: string[], b: string[]) => a.length === b.length && a.every((w, i) => w === b[i]);
 
 // ตัวเลขใต้ชื่อเมนูในแถบด้านข้าง (นับจากข้อมูลจริง)
 const TOTAL_WORDS = Object.values(wordsData).reduce((n, words) => n + words.length, 0);
@@ -140,6 +143,9 @@ export const StudentDashboard: React.FC = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const frameTickerRef = useRef<Worker | null>(null);
+  // โหมดเบา (/ai2/ บน Pi): ส่งภาพใหม่เมื่อ AI ตอบภาพก่อนหน้าแล้ว — sendFrameRef ให้ onmessage สั่งส่งภาพถัดไปได้ทันที
+  const liteSenderRef = useRef(new LiteFrameSender(FRAME_SEND_INTERVAL_MS));
+  const sendFrameRef = useRef<(() => void) | null>(null);
   const isCameraOnRef = useRef(isCameraOn);
   const isShowSkeletonRef = useRef(isShowSkeleton);
   // loop วาดภาพกล้อง (requestAnimationFrame) ถูกสร้างครั้งเดียวตอนเปิดกล้อง จึงต้องอ่านค่าล่าสุดผ่าน ref
@@ -404,6 +410,7 @@ export const StudentDashboard: React.FC = () => {
 
       socket.onopen = () => {
         reconnectDelay = 1000;
+        liteSenderRef.current.onReply();
         // เชื่อมต่อใหม่ = session ใหม่ฝั่ง server ที่นับ prediction_id จาก 0 ใหม่ ต้องล้างค่าเดิม
         // ไม่งั้นท่าแรกของ session ใหม่อาจได้ id ตรงกับค่าเก่าพอดีแล้วถูกมองข้ามไป
         lastPredictionIdRef.current = -1;
@@ -422,6 +429,11 @@ export const StudentDashboard: React.FC = () => {
           return;
         }
         if (!data || data.type !== 'prediction') return;
+
+        if (IS_LITE_UI) {
+          const wait = liteSenderRef.current.onReply();
+          setTimeout(() => sendFrameRef.current?.(), wait);
+        }
 
         // อัปเดตกล่องตรวจจับคำเดี่ยวทุกครั้งที่มีการทำนายใหม่จริง ๆ (prediction_id เปลี่ยน)
         // backend ส่ง word เดิมซ้ำทุกเฟรม จึงเทียบที่ตัวคำไม่ได้ — ถ้าเทียบที่คำ ผู้ใช้ทำคำเดิมซ้ำ
@@ -458,7 +470,10 @@ export const StudentDashboard: React.FC = () => {
         const epoch = typeof data.sentence_epoch === 'number' ? data.sentence_epoch : 0;
         lastSentenceEpochRef.current = epoch;
         if (epoch >= minSentenceEpochRef.current) {
-          setRecordedWords(Array.isArray(data.tsl_sequence) ? data.tsl_sequence : []);
+          // ข้อความจาก AI มาราว 10 ครั้ง/วินาที และสร้าง array ใหม่ทุกครั้งแม้คำจะเหมือนเดิม ทำให้ทั้งหน้า render ซ้ำตลอด
+          // โหมดเบา: คืนค่าเดิมเมื่อคำไม่เปลี่ยน React จะได้ข้ามการ render
+          const sequence = Array.isArray(data.tsl_sequence) ? data.tsl_sequence : [];
+          setRecordedWords((prev) => (IS_LITE_UI && sameWords(prev, sequence) ? prev : sequence));
           const sentenceWords = data.sentence ? data.sentence.split(' ').filter(Boolean) : [];
           const prevSentence = currentSentenceRef.current;
           if (sentenceWords.length > 0 && sentenceWords.join(' ') !== prevSentence.join(' ')) {
@@ -469,7 +484,7 @@ export const StudentDashboard: React.FC = () => {
             setLastSentence(prevSentence);
             currentSentenceRef.current = [];
           }
-          setTransformedWords(sentenceWords);
+          setTransformedWords((prev) => (IS_LITE_UI && sameWords(prev, sentenceWords) ? prev : sentenceWords));
         }
 
         // ภาพ skeleton overlay ที่ backend วาดกลับมาให้ (เมื่อเปิดใช้งาน)
@@ -535,7 +550,7 @@ export const StudentDashboard: React.FC = () => {
       console.error('[frameTicker worker error]', e.message, e);
     };
 
-    worker.onmessage = () => {
+    const sendFrame = () => {
       const video = videoRef.current;
       const sendCanvas = sendCanvasRef.current;
       const socket = wsRef.current;
@@ -544,6 +559,7 @@ export const StudentDashboard: React.FC = () => {
       if (!sendCanvas || !socket || socket.readyState !== WebSocket.OPEN) return;
       // เฟรมก่อนหน้ายังอัปโหลดไม่เสร็จ (เน็ตช้า) → ข้ามเฟรมนี้ ไม่ให้เฟรมค้างเป็นคิวจน delay สะสมยาวขึ้นเรื่อย ๆ
       if (socket.bufferedAmount > 0) return;
+      if (IS_LITE_UI && !liteSenderRef.current.ready()) return;
 
       const ctx = sendCanvas.getContext('2d');
       if (!ctx) return;
@@ -557,15 +573,25 @@ export const StudentDashboard: React.FC = () => {
       if (sendCanvas.height !== sendH) sendCanvas.height = sendH;
       ctx.drawImage(video, 0, 0, sendW, sendH);
 
+      const buildMessage = (base64: string) =>
+        JSON.stringify({ image: base64, showSkeleton: isShowSkeletonRef.current, page: 'student' });
+      if (IS_LITE_UI) {
+        liteSenderRef.current.send(sendCanvas, socket, 0.8, buildMessage);
+        return;
+      }
+
       const base64 = sendCanvas.toDataURL('image/jpeg', 0.8).split(',')[1];
       if (!base64) return;
 
-      socket.send(JSON.stringify({ image: base64, showSkeleton: isShowSkeletonRef.current, page: 'student' }));
+      socket.send(buildMessage(base64));
     };
+    sendFrameRef.current = sendFrame;
+    worker.onmessage = sendFrame;
 
     worker.postMessage({ type: 'start', intervalMs: FRAME_SEND_INTERVAL_MS });
 
     return () => {
+      sendFrameRef.current = null;
       worker.postMessage({ type: 'stop' });
       worker.terminate();
       frameTickerRef.current = null;
@@ -951,7 +977,7 @@ export const StudentDashboard: React.FC = () => {
 
       {/* GLOBAL DECORATIVE STYLES */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap');
+        ${__SB_OFFLINE__ ? '' : "@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap');"}
 
         .sb-nav-item { transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease; }
         .sb-topbar { background: ${__SB_RED_THEME__ ? RED_TOPBAR_GRADIENT : 'linear-gradient(120deg, #0d47a1 0%, #123a80 28%, #1a5aa8 55%, #4fa3e0 82%, #6fbeef 100%)'}; }

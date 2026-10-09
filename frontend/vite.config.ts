@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from 'vite'; import react from '@vitejs/plugin-react';
-import { existsSync, readdirSync } from 'node:fs';
+import { cpSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // ธีมสีแบบเลือกตอน build: ตั้ง SB_THEME=red ตอน build จะได้เว็บธีมแดง-ขาว-ทอง
@@ -83,6 +83,31 @@ function headerLogosPlugin(theme: string | undefined): Plugin {
   };
 }
 
+// build สำหรับ Raspberry Pi ที่ต้องใช้งานได้แม้ไม่มีอินเทอร์เน็ต (SB_OFFLINE=1, ดู docker-compose.pi.yml):
+// คัดลอกไฟล์โมเดลเบลอพื้นหลัง (MediaPipe Selfie Segmentation) จาก node_modules มาไว้ใน dist/mediapipe/
+// แทนการโหลดจาก cdn.jsdelivr.net — build ปกติไม่ทำอะไร
+const SELFIE_SEG_DIR = fileURLToPath(new URL('./node_modules/@mediapipe/selfie_segmentation/', import.meta.url));
+
+function offlineMediapipePlugin(offline: boolean): Plugin {
+  let outDir = 'dist';
+  return {
+    name: 'signbridge-offline-mediapipe',
+    apply: 'build',
+    configResolved(config) {
+      outDir = config.build.outDir;
+    },
+    writeBundle() {
+      if (!offline) return;
+      cpSync(SELFIE_SEG_DIR, `${outDir}/mediapipe/selfie_segmentation`, {
+        recursive: true,
+        filter: (src) => !/\.(md|ts|json)$/i.test(src),
+      });
+    },
+  };
+}
+
+const SB_OFFLINE = process.env.SB_OFFLINE === '1';
+
 // base: './' (relative) ทำให้ build เดียวกันนี้ใช้ได้ทั้งตอนรันที่ root
 // (localhost:8080 ตอน dev/ทดสอบบนโน้ตบุ๊ค) และตอนถูกเสิร์ฟใต้ path ย่อยอย่าง
 // /ai/ หรือ /ai2/ บนเซิร์ฟเวอร์ของโรงเรียน โดยไม่ต้อง build แยกสองรอบ
@@ -90,6 +115,9 @@ function headerLogosPlugin(theme: string | undefined): Plugin {
 // ค่าเป็น true/false ตายตัวตอน build ฝั่งที่ไม่ได้ใช้จึงถูกตัดทิ้งไปจากไฟล์ที่ build ออกมา
 export default defineConfig({
   base: './',
-  define: { __SB_RED_THEME__: JSON.stringify(process.env.SB_THEME === 'red') },
-  plugins: [themePlugin(process.env.SB_THEME), headerLogosPlugin(process.env.SB_THEME), react()],
+  define: {
+    __SB_RED_THEME__: JSON.stringify(process.env.SB_THEME === 'red'),
+    __SB_OFFLINE__: JSON.stringify(SB_OFFLINE),
+  },
+  plugins: [themePlugin(process.env.SB_THEME), headerLogosPlugin(process.env.SB_THEME), offlineMediapipePlugin(SB_OFFLINE), react()],
 });

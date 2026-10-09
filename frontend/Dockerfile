@@ -8,7 +8,9 @@ RUN npm ci
 COPY . .
 # SB_THEME=red -> ธีมแดง-ทองสำหรับ /ai2/ (ว่าง = ธีมน้ำเงินเดิมของ /ai/) ดู vite.config.ts
 ARG SB_THEME=
-RUN SB_THEME=$SB_THEME npm run build
+# SB_OFFLINE=1 -> build สำหรับ Raspberry Pi ที่ใช้งานได้แม้ไม่มีอินเทอร์เน็ต (ฟอนต์/โมเดลเบลออยู่ในเว็บเอง) ดู docker-compose.pi.yml
+ARG SB_OFFLINE=
+RUN SB_THEME=$SB_THEME SB_OFFLINE=$SB_OFFLINE npm run build
 
 # ---- Serve stage ----
 FROM nginx:1.27-alpine

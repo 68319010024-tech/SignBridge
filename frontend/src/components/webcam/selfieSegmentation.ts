@@ -2,7 +2,11 @@
 //
 // เดิมสร้างโมเดลใหม่ทุกครั้งที่กดเปิด/ปิดเบลอหรือสลับกล้อง และโหลดตั้งแต่เปิดหน้าแม้ไม่ได้ใช้เบลอ
 // ซึ่งช้ามากบน Raspberry Pi — ตอนนี้โหลดตอนกดเปิดเบลอครั้งแรก แล้วใช้ตัวเดิมต่อไป
-const BASE_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation';
+// build สำหรับ Pi แบบออฟไลน์: ไฟล์โมเดลถูกคัดลอกมาไว้ในเว็บเอง (ดู offlineMediapipePlugin ใน vite.config.ts)
+// path แบบ relative อิงจากหน้าเว็บ จึงใช้ได้ทั้งที่ root และใต้ /ai2/
+const BASE_URL = __SB_OFFLINE__
+  ? 'mediapipe/selfie_segmentation'
+  : 'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation';
 
 const loadScript = (src: string) =>
   new Promise<void>((resolve, reject) => {

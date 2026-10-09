@@ -5,3 +5,6 @@ declare module 'virtual:sb-header-logos' {
   const logos: string[];
   export default logos;
 }
+
+// build สำหรับ Pi แบบออฟไลน์ (SB_OFFLINE=1): ฟอนต์และโมเดลเบลอพื้นหลังอยู่ในเว็บเอง ไม่โหลดจากอินเทอร์เน็ต
+declare const __SB_OFFLINE__: boolean;
