@@ -30,9 +30,12 @@ for i in \$(seq 1 60); do
 done
 # --use-fake-ui-for-media-stream: อนุญาตกล้องให้อัตโนมัติ ไม่ต้องกด Allow ทุกครั้งที่เปิดเครื่อง
 # --disable-session-crashed-bubble: ไม่ขึ้นแถบ "กู้คืนหน้า" เมื่อปิดเครื่องด้วยการถอดปลั๊ก
+# WebRtcPipeWireCamera: Chromium บน Pi OS หากล้องผ่าน PipeWire แล้วไม่เจอ C270 ("No camera available" และเปิดกล้องค้าง)
+#   ปิดไว้ให้เปิดกล้องผ่าน V4L2 ตรง ๆ — ต้องอยู่ใน --disable-features ตัวเดียวกัน (ใส่หลายตัว Chromium ใช้แค่ตัวสุดท้าย)
+# --password-store=basic: ไม่ถาม "Unlock Keyring" ซึ่งทำให้หน้าเว็บค้างโหลดจนกว่าจะมีคนกด
 exec "$BROWSER" --kiosk "$URL" \\
   --noerrdialogs --disable-infobars --no-first-run \\
-  --disable-session-crashed-bubble --disable-features=Translate \\
+  --disable-session-crashed-bubble --disable-features=Translate,WebRtcPipeWireCamera \\
   --password-store=basic --use-fake-ui-for-media-stream \\
   --check-for-update-interval=31536000
 EOF
